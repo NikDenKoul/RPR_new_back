@@ -58,7 +58,7 @@ app.use(express.urlencoded({ extended: true}));
 
 app.use(bearerToken());
 
-//const GameMechanics = require('./GameMechanics');
+const GameMechanics = require('./GameMechanics');
 const ValidatingFunctions = require('./ValidatingFunctions');
 
 const db = mysql.createPool({
@@ -813,41 +813,7 @@ app.put("/attributes",
     body("deletedIds").toArray().isArray(),
     ValidatingFunctions.verifyFields,
     ValidatingFunctions.verifyToken,
-    async function(req,res) {
-        // Парсинг массива аттрибутов
-        let attributes = JSON.parse(req.body.attributes);
-        let deletedIds = JSON.parse(req.body.deletedIds);
-        let serverId = req.body.serverId;
-
-        // Проверка прав доступа для редактирования набора аттрибутов
-        let permission = await ValidatingFunctions.checkRights("server_edit",req.userId,serverId);
-        if(!permission){
-            res.status(403).send({error:"access denied"});
-            return;
-        }
-
-        // Изменение набора аттрибутов на сервере
-        attributes.forEach((attribute, order) => {
-                // Добавление нового аттрибута (т. к. id'шник был нулевой, присваивается новый)
-                if (attribute.id <= 0) {
-                    dbP.execute("INSERT INTO attribute VALUES (NULL, ?, ?, ?, ?);",
-                        [serverId, attribute.name, attribute.type, attribute.isGeneral]);
-                }
-                // Обновление существующего аттрибута
-                else {
-                    dbP.execute("UPDATE attribute SET server_id=?, name=?, type=?, isGeneral=? WHERE id=?;",
-                        [serverId, attribute.name, attribute.type, attribute.isGeneral, attribute.id]);
-                }
-            }
-        )
-
-        // Удаление аттрибутов
-        deletedIds.forEach((attribute_id) => {
-            dbP.execute("DELETE FROM attribute WHERE id=?",[attribute_id]);
-        })
-
-        res.send({success:1});
-    }
+    GameMechanics.editAttributes
 )
 
 app.delete("/attributes",
