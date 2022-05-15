@@ -1,4 +1,4 @@
- 
+
 let express = require('express');
 let app = express();
 const mysql = require("mysql2");
@@ -57,6 +57,9 @@ app.use("/registration", express.static(__dirname + '/public'));
 app.use(express.urlencoded({ extended: true}));
 
 app.use(bearerToken());
+
+//const GameMechanics = require('./GameMechanics');
+const ValidatingFunctions = require('./ValidatingFunctions');
 
 const db = mysql.createPool({
     connectionLimit: 15,
@@ -205,7 +208,7 @@ https1.listen(8084, "rp-ruler.ru", () =>
     console.log(`Socket listens`)
 )
 
-app.get('/rooms',query("serverId").isInt(), verifyFields, verifyToken,async function(req, res) {
+app.get('/rooms',query("serverId").isInt(), ValidatingFunctions.verifyFields, ValidatingFunctions.verifyToken,async function(req, res) {
     if(req.query.serverId == 0){
         db.query("SELECT room.*,user.login FROM room LEFT JOIN room_user ON room.id=room_user.room_id \n" +
             "                                                              AND room_user.user_id != ? \n" +
@@ -239,7 +242,7 @@ app.get("/profile",function (req,res){
     });
 });
 
-app.put("/profile",verifyToken,async function(req,res){
+app.put("/profile",ValidatingFunctions.verifyToken,async function(req,res){
     if(req.body.login != "null"){
         let [user] = await dbP.execute("SELECT id FROM user WHERE login=?",[req.body.login]);
         if(user.length > 0){
@@ -276,7 +279,11 @@ app.put("/profile",verifyToken,async function(req,res){
 })
 
 
-app.get("/users_in_room",query("roomId").isInt(),verifyFields,verifyToken,async function (req,res){
+app.get("/users_in_room",
+    query("roomId").isInt(),
+    ValidatingFunctions.verifyFields,
+    ValidatingFunctions.verifyToken,
+    async function (req,res) {
     let [serverId] = await dbP.execute("SELECT server_id FROM room WHERE id=?",[req.query.roomId]);
     serverId = serverId[0].server_id;
 
@@ -288,7 +295,7 @@ app.get("/users_in_room",query("roomId").isInt(),verifyFields,verifyToken,async 
 })
 
 
-app.get("/users_on_server",query("serverId").isInt(),verifyFields,verifyToken,async function(req,res){
+app.get("/users_on_server",query("serverId").isInt(),ValidatingFunctions.verifyFields,ValidatingFunctions.verifyToken,async function(req,res){
     let [users] = await dbP.execute("SELECT user.login,user.avatar,user.id,user.status,UNIX_TIMESTAMP(user.last_time_online) AS last_time_online,role.color,users_servers.role_id,role.role_order FROM users_servers\n" +
         "    LEFT JOIN user ON users_servers.user_id = user.id LEFT JOIN role ON role.id=users_servers.role_id WHERE users_servers.server_id=?",[req.query.serverId]);
 
@@ -297,7 +304,7 @@ app.get("/users_on_server",query("serverId").isInt(),verifyFields,verifyToken,as
     res.send({users:users});
 })
 
-app.get("/servers_of_user",verifyToken,async function(req,res){
+app.get("/servers_of_user",ValidatingFunctions.verifyToken,async function(req,res){
     let [servers] = await dbP.execute("SELECT server.name,server.card_bg,server.id,server.admin_id,server.avatar,server.last_msg_id,server.description,server.tags,server.is_private,server.age FROM\n" +
         "                                    users_servers AS us LEFT JOIN server ON us.server_id = server.id \n" +
         "                                    WHERE us.user_id=?",[req.userId]);
@@ -310,13 +317,13 @@ app.get("/servers_of_user",verifyToken,async function(req,res){
     res.send(servers);
 })
 
-app.get("/role",query("serverId").isInt(),verifyFields,verifyToken,async function(req,res){
+app.get("/role",query("serverId").isInt(),ValidatingFunctions.verifyFields,ValidatingFunctions.verifyToken,async function(req,res){
     let [role] = await dbP.execute("SELECT role.* FROM users_servers LEFT JOIN role ON role.id=users_servers.role_id WHERE users_servers.user_id=? AND users_servers.server_id=?"
         ,[req.userId,req.query.serverId]);
     res.send({role:role});
 })
 
-app.get("/servers",verifyToken,async function(req,res){
+app.get("/servers",ValidatingFunctions.verifyToken,async function(req,res){
     let limit = req.query.limit ?? 40;
     let offset = req.query.offset ?? 0;
     let search = req.query.s ?? "";
@@ -334,18 +341,32 @@ app.get("/servers",verifyToken,async function(req,res){
     res.send({servers:servers});
 })
 
-app.put("/role_of_user",body("serverId").isInt(),body("roleId").isInt(),body("userId").isInt(),verifyFields,verifyToken,async function (req,res){
+app.put("/role_of_user",
+    body("serverId").isInt(),
+    body("roleId").isInt(),
+    body("userId").isInt(),
+    ValidatingFunctions.verifyFields,
+    ValidatingFunctions.verifyToken,
+    async function (req,res){
 
 })
 
-app.get("/categories",query("serverId").isInt(),verifyFields,verifyToken,async function (req,res){
+app.get("/categories",query("serverId").isInt(),
+    ValidatingFunctions.verifyFields,
+    ValidatingFunctions.verifyToken,
+    async function (req,res){
     let [categories] = await dbP.execute("SELECT * FROM rooms_category WHERE server_id=?",[req.query.serverId]);
     res.send({categories:categories});
 })
 
 
-app.post("/categories",body("serverId").isInt(),body("name").isString().isLength({min:1,max:35}),verifyFields,verifyToken,async function(req,res){
-    let permission = await checkRights("room_edit",req.userId,req.body.serverId);
+app.post("/categories",
+    body("serverId").isInt(),
+    body("name").isString().isLength({min:1,max:35}),
+    ValidatingFunctions.verifyFields,
+    ValidatingFunctions.verifyToken,
+    async function(req,res){
+    let permission = await ValidatingFunctions.checkRights("room_edit",req.userId,req.body.serverId);
 
     if(!permission){
         res.status(403).send({error:"access denied"});
@@ -356,10 +377,15 @@ app.post("/categories",body("serverId").isInt(),body("name").isString().isLength
     res.send({success:1});
 })
 
-app.put("/categories",body("categoryId").isInt(),body("name").isString().isLength({min:1,max:35}),verifyFields,verifyToken,async function(req,res){
+app.put("/categories",
+    body("categoryId").isInt(),
+    body("name").isString().isLength({min:1,max:35}),
+    ValidatingFunctions.verifyFields,
+    ValidatingFunctions.verifyToken,
+    async function(req,res){
     let [serverId] = await dbP.execute("SELECT server_id FROM rooms_category WHERE id=?",[req.body.categoryId]);
     serverId = serverId[0].server_id;
-    let permission = await checkRights("room_edit",req.userId,serverId);
+    let permission = await ValidatingFunctions.checkRights("room_edit",req.userId,serverId);
 
     if(!permission){
         res.status(403).send({error:"access denied"});
@@ -374,9 +400,11 @@ app.put("/categories",body("categoryId").isInt(),body("name").isString().isLengt
 app.post("/rooms",
     body("serverId").isInt(),
     body("name").isString().isLength({min:1,max:35}),
-    verifyFields,verifyToken,async function(req,res){
+    ValidatingFunctions.verifyFields,
+    ValidatingFunctions.verifyToken,
+    async function(req,res){
 
-    let permission = await checkRights("room_edit",req.userId,req.body.serverId);
+    let permission = await ValidatingFunctions.checkRights("room_edit",req.userId,req.body.serverId);
     if(!permission){
         res.status(403).send({error:"access denied"});
         return;
@@ -387,7 +415,10 @@ app.post("/rooms",
     res.send({success:1});
 })
 
-app.put("/change_alert",body("roomId").isInt(),verifyFields,verifyToken,async function(req,res){
+app.put("/change_alert",body("roomId").isInt(),
+    ValidatingFunctions.verifyFields,
+    ValidatingFunctions.verifyToken,
+    async function(req,res){
     await dbP.execute("UPDATE room_user SET is_muted = !is_muted WHERE user_id=? AND room_id=?;",[req.userId,req.body.roomId]);
     res.send({success:1});
 })
@@ -402,7 +433,11 @@ app.get("/check_token",function (req,res){
     });
 })
 
-app.put("/connect_to_server",query("serverId").isInt(),verifyFields,verifyToken,async function(req,res){
+app.put("/connect_to_server",
+    query("serverId").isInt(),
+    ValidatingFunctions.verifyFields,
+    ValidatingFunctions.verifyToken,
+    async function(req,res){
     let [roleId] = await dbP.execute("SELECT id FROM role WHERE server_id=? ORDER BY role_order DESC LIMIT 1",[req.query.serverId]);
     roleId = roleId[0].id;
 
@@ -422,7 +457,9 @@ app.post("/servers",
     body("name").isString().isLength({min:1,max:20}),
     body("age").isInt(),
     body("isPrivate").isInt(),
-    verifyFields,verifyToken,async function(req,res){
+    ValidatingFunctions.verifyFields,
+    ValidatingFunctions.verifyToken,
+    async function(req,res){
         db.query("INSERT INTO server VALUES(NULL,?,?,?,?,?,0,?,?,?,1)",
             [req.body.name,req.body.description ?? "",req.body.avatar ?? null,req.body.bg ?? null,req.body.isPrivate,req.userId,req.body.age,req.body.tags ?? ""],async function(err,data){
                 let serverId = data.insertId;
@@ -437,16 +474,22 @@ app.post("/servers",
 )
 
 
-app.delete("/users",verifyToken,async function (req,res){
+app.delete("/users",
+    ValidatingFunctions.verifyToken,
+    async function (req,res){
     dbP.execute("DELETE FROM user WHERE id=?",[req.userId]);
     res.send({success:1});
 })
 
-app.delete("/categories",query("categoryId").isInt(),verifyFields,verifyToken,async function (req,res){
+app.delete("/categories",
+    query("categoryId").isInt(),
+    ValidatingFunctions.verifyFields,
+    ValidatingFunctions.verifyToken,
+    async function (req,res){
     let [serverId] = await dbP.execute("SELECT server_id FROM rooms_category WHERE id=?",[req.query.categoryId]);
     serverId = serverId[0].server_id;
 
-    let permission = await checkRights("room_edit",req.userId,serverId);
+    let permission = await ValidatingFunctions.checkRights("room_edit",req.userId,serverId);
     if(!permission){
         res.status(403).send({error:"access denied"});
         return;
@@ -456,10 +499,14 @@ app.delete("/categories",query("categoryId").isInt(),verifyFields,verifyToken,as
     res.send({success:1});
 })
 
-app.delete("/rooms",query("roomId").isInt(),verifyFields,verifyToken,async function(req,res){
+app.delete("/rooms",
+    query("roomId").isInt(),
+    ValidatingFunctions.verifyFields,
+    ValidatingFunctions.verifyToken,
+    async function(req,res){
     let [serverId] = await dbP.execute("SELECT server_id FROM room WHERE id=?",[req.query.roomId]);
     serverId = serverId[0].server_id;
-    let permission = await checkRights("room_edit",req.userId,serverId);
+    let permission = await ValidatingFunctions.checkRights("room_edit",req.userId,serverId);
     if(!permission){
         res.status(403).send({error:"access denied"});
         return;
@@ -469,7 +516,11 @@ app.delete("/rooms",query("roomId").isInt(),verifyFields,verifyToken,async funct
     res.send({success:1});
 })
 
-app.delete("/servers",query("serverId"),verifyFields,verifyToken,async function(req,res){
+app.delete("/servers",
+    query("serverId"),
+    ValidatingFunctions.verifyFields,
+    ValidatingFunctions.verifyToken,
+    async function(req,res){
     let [servers] = await dbP.execute("SELECT id FROM server WHERE id=? AND admin_id=?",[req.query.serverId,req.userId]);
     if(servers.length === 0){
         res.status(403).send({error:"access denied"});
@@ -479,7 +530,11 @@ app.delete("/servers",query("serverId"),verifyFields,verifyToken,async function(
     res.send({success:1});
 })
 
-app.put("/disconnect_from_server",body("serverId"),verifyFields,verifyToken,async function(req,res){
+app.put("/disconnect_from_server",
+    body("serverId"),
+    ValidatingFunctions.verifyFields,
+    ValidatingFunctions.verifyToken,
+    async function(req,res){
     await dbP.execute("DELETE FROM users_servers WHERE server_id=? AND user_id=?",[req.body.serverId,req.userId]);
     await dbP.execute("UPDATE server SET count = count - 1 WHERE id=?",[req.body.serverId]);
     res.send({success:1});
@@ -492,8 +547,10 @@ app.put("/servers",
     body("roles").toArray().isArray({min:1}),
     body("roles").toArray().isArray(),
     body("isPrivate").isInt(),
-    verifyFields,verifyToken,async function(req,res){
-        let permission = await checkRights("server_edit",req.userId,req.body.serverId);
+    ValidatingFunctions.verifyFields,
+    ValidatingFunctions.verifyToken,
+    async function(req,res){
+        let permission = await ValidatingFunctions.checkRights("server_edit",req.userId,req.body.serverId);
         if(!permission){
             res.status(403).send({error:"access denied"});
             return;
@@ -550,7 +607,10 @@ app.put("/servers",
 
     })
 
-app.post("/login_api",body("login").isString().isLength({min:1}),body("password").isString().isLength({min:4}),verifyFields,
+app.post("/login_api",
+    body("login").isString().isLength({min:1}),
+    body("password").isString().isLength({min:4}),
+    ValidatingFunctions.verifyFields,
     async function(req,res){
     let [user] = await dbP.execute("SELECT * FROM user WHERE (email=? OR login=?) AND password=md5(?) LIMIT 1",[req.body.login,req.body.login,req.body.password]);
     if(user.length > 0){
@@ -565,7 +625,8 @@ app.post("/login_api",body("login").isString().isLength({min:1}),body("password"
 app.post("/register_api",
     body("email").isEmail(),
     body("password").isString().isLength({min:6}),
-    body("login").isString().isLength({min:1}),verifyFields,async function(req,res){
+    body("login").isString().isLength({min:1}),
+    ValidatingFunctions.verifyFields,async function(req,res){
         //не занят ли логин
         let [loginCheck] = await dbP.execute("SELECT * FROM user WHERE login=?",[req.body.login]);
         if(loginCheck.length !== 0){
@@ -586,7 +647,7 @@ app.post("/register_api",
 
     })
 
-app.post("/logout",verifyToken,function (req,res){
+app.post("/logout",ValidatingFunctions.verifyToken,function (req,res){
     dbP.execute("UPDATE user SET token=NULL WHERE token=?",[req.token]);
     res.send({success:1});
 })
@@ -595,8 +656,10 @@ app.put("/rooms",
     body("roomId").isInt(),
     body("serverId").isInt(),
     body("name").isString().isLength({min:1}),
-    verifyFields,verifyToken,async function (req,res){
-        let permission = await checkRights("room_edit",req.userId,req.body.serverId);
+    ValidatingFunctions.verifyFields,
+    ValidatingFunctions.verifyToken,
+    async function (req,res){
+        let permission = await ValidatingFunctions.checkRights("room_edit",req.userId,req.body.serverId);
         if(!permission){
             res.status(403).send({error:"access denied"});
             return;
@@ -607,11 +670,16 @@ app.put("/rooms",
         res.send({success:1});
 })
 
-app.put("/set_category_of_room",body("roomId").isInt(),body("order").isInt(),verifyFields,verifyToken,async function(req,res){
+app.put("/set_category_of_room",
+    body("roomId").isInt(),
+    body("order").isInt(),
+    ValidatingFunctions.verifyFields,
+    ValidatingFunctions.verifyToken,
+    async function(req,res){
     let [serverId] = await dbP.execute("SELECT server_id FROM room WHERE id=?",[req.body.roomId]);
     serverId = serverId[0].server_id;
     let categoryId = req.body.categoryId === "null" ? null : req.body.categoryId;
-    let permission = await checkRights("room_edit",req.userId,serverId);
+    let permission = await ValidatingFunctions.checkRights("room_edit",req.userId,serverId);
     if(!permission){
         res.status(403).send({error:"access denied"});
         return;
@@ -621,7 +689,11 @@ app.put("/set_category_of_room",body("roomId").isInt(),body("order").isInt(),ver
     res.send({success:1});
 })
 
-app.get("/room_with_user",query("userId").isInt(),verifyFields,verifyToken,async function(req,res){
+app.get("/room_with_user",
+    query("userId").isInt(),
+    ValidatingFunctions.verifyFields,
+    ValidatingFunctions.verifyToken,
+    async function(req,res){
     let [roomId] = await dbP.execute("SELECT room_id FROM room_user WHERE user_id=? AND room_id IN\n" +
         " (SELECT room_id FROM room_user WHERE user_id=?)\n" +
         "  AND room_id IN (SELECT id FROM room WHERE server_id=0)",[req.userId,req.query.userId]);
@@ -641,7 +713,9 @@ app.get("/room_with_user",query("userId").isInt(),verifyFields,verifyToken,async
 
 })
 
-app.get("/messages",query("roomId").isInt(),verifyFields,verifyToken,async function(req,res){
+app.get("/messages",query("roomId").isInt(),
+    ValidatingFunctions.verifyFields,
+    ValidatingFunctions.verifyToken,async function(req,res){
     const limit = req.query.limit ?? 60;
     const offset = req.query.offset ?? 0;
     let [serverId] = await dbP.execute("SELECT server_id FROM room WHERE id=?",[req.query.roomId]);
@@ -665,20 +739,31 @@ app.get("/messages",query("roomId").isInt(),verifyFields,verifyToken,async funct
 
 })
 
-app.put("/messages_read",body("roomId").isInt(),body("messageId").isInt(),verifyFields,verifyToken,async function(req,res){
+app.put("/messages_read",
+    body("roomId").isInt(),
+    body("messageId").isInt(),
+    ValidatingFunctions.verifyFields,
+    ValidatingFunctions.verifyToken,
+    async function(req,res){
     dbP.execute("INSERT INTO room_user VALUES(NULL,?,?,?,0) ON DUPLICATE KEY UPDATE last_read_msg_id=?;",[req.body.roomId,req.userId,req.body.messageId,req.body.messageId]);
     res.send({success:1});
 })
 
 
-app.get("/roles",query("serverId").isInt(),verifyFields,verifyToken,async function(req,res){
+app.get("/roles",
+    query("serverId").isInt(),
+    ValidatingFunctions.verifyFields,
+    ValidatingFunctions.verifyToken,
+    async function(req,res){
     let [role] = await dbP.execute("SELECT role.* FROM users_servers LEFT JOIN role ON role.id=users_servers.role_id WHERE users_servers.user_id=? AND users_servers.server_id=?",
         [req.userId,req.query.serverId]);
     res.send({role:role[0]});
 })
 
 
-app.post("/upload_avatar",verifyToken,async function(req,res){
+app.post("/upload_avatar",
+    ValidatingFunctions.verifyToken,
+    async function(req,res){
 
     const newName = require('crypto').randomBytes(10).toString('hex') +"."+ req.files.avatar.name.split(".").pop();
 
@@ -701,7 +786,9 @@ app.post("/upload_avatar",verifyToken,async function(req,res){
 
 })
 
-app.post("/upload_file",verifyToken,async function(req,res){
+app.post("/upload_file",
+    ValidatingFunctions.verifyToken,
+    async function(req,res){
 
     const newName = require('crypto').randomBytes(10).toString('hex') +"."+ req.files.file.name.split(".").pop();
 
@@ -724,7 +811,8 @@ app.put("/attributes",
     body("attributes").toArray().isArray(),
     body("deletedIds").toArray().isArray({min:1}),
     body("deletedIds").toArray().isArray(),
-    verifyFields,verifyToken,
+    ValidatingFunctions.verifyFields,
+    ValidatingFunctions.verifyToken,
     async function(req,res) {
         // Парсинг массива аттрибутов
         let attributes = JSON.parse(req.body.attributes);
@@ -732,7 +820,7 @@ app.put("/attributes",
         let serverId = req.body.serverId;
 
         // Проверка прав доступа для редактирования набора аттрибутов
-        let permission = await checkRights("server_edit",req.userId,serverId);
+        let permission = await ValidatingFunctions.checkRights("server_edit",req.userId,serverId);
         if(!permission){
             res.status(403).send({error:"access denied"});
             return;
@@ -762,31 +850,43 @@ app.put("/attributes",
     }
 )
 
-app.delete("/attributes", query("id").isInt(), verifyFields,verifyToken, async function (req,res){
-    // Получение Id сервера, на котором удаляется аттрибут из набора
-    let [serverId] = await dbP.execute("SELECT server_id FROM attribute WHERE id=?;",[req.query.id]);
-    serverId = serverId[0].server_id;
+app.delete("/attributes",
+    query("id").isInt(),
+    ValidatingFunctions.verifyFields,
+    ValidatingFunctions.verifyToken,
+    async function (req,res){
+        // Получение Id сервера, на котором удаляется аттрибут из набора
+        let [serverId] = await dbP.execute("SELECT server_id FROM attribute WHERE id=?;",[req.query.id]);
+        serverId = serverId[0].server_id;
 
-    // Проверка прав доступа удаления аттрибута
-    let permission = await checkRights("server_edit",req.userId,serverId);
-    if(!permission){
-        res.status(403).send({error:"access denied"});
-        return;
-    }
+        // Проверка прав доступа удаления аттрибута
+        let permission = await ValidatingFunctions.checkRights("server_edit",req.userId,serverId);
+        if(!permission){
+            res.status(403).send({error:"access denied"});
+            return;
+        }
 
-    // Удаление аттрибута из набора
-    await dbP.execute("DELETE FROM attribute WHERE id=?",[req.query.id]);
-    res.send({success:1});
+        // Удаление аттрибута из набора
+        await dbP.execute("DELETE FROM attribute WHERE id=?",[req.query.id]);
+        res.send({success:1});
     }
 )
 
-app.get("/profile_attributes",query("serverId").isInt(),verifyFields,verifyToken,async function (req,res){
+app.get("/profile_attributes",
+    query("serverId").isInt(),
+    ValidatingFunctions.verifyFields,
+    ValidatingFunctions.verifyToken,
+    async function (req,res){
     let [data] = await dbP.execute("SELECT `attribute`.* FROM attribute WHERE attribute.server_id = ? AND  isGeneral = 1;",
         [req.query.serverId]);
     res.send({data:data});
 })
 
-app.get("/all_attributes",query("serverId").isInt(),verifyFields,verifyToken,async function (req,res){
+app.get("/all_attributes",
+    query("serverId").isInt(),
+    ValidatingFunctions.verifyFields,
+    ValidatingFunctions.verifyToken,
+    async function (req,res){
     let [data] = await dbP.execute("SELECT `attribute`.* FROM attribute WHERE attribute.server_id = ?",
         [req.query.serverId]);
     res.send({data:data});
@@ -806,14 +906,15 @@ app.put("/levels",
     body("levels").toArray().isArray(),
     body("deletedIds").toArray().isArray({min:1}),
     body("deletedIds").toArray().isArray(),
-    verifyFields,verifyToken,
+    ValidatingFunctions.verifyFields,
+    ValidatingFunctions.verifyToken,
     async function(req,res){
         let levels = JSON.parse(req.body.levels);
         let deletedIds = JSON.parse(req.body.deletedIds);
         let serverId = req.body.serverId;
 
         // Проверка прав доступа для редактирования набора аттрибутов
-        let permission = await checkRights("server_edit",req.userId,serverId);
+        let permission = await ValidatingFunctions.checkRights("server_edit",req.userId,serverId);
         if(!permission){
             res.status(403).send({error:"access denied"});
             return;
@@ -850,19 +951,24 @@ app.put("/levels",
         })
 
         res.send({success:1});
-})
+    })
 
 /**
  * Получить значения всех аттрибутов по уровням
  */
-app.get("/levels",query("serverId").isInt(),verifyFields,verifyToken,async function(req,res){
+app.get("/levels",
+    query("serverId").isInt(),
+    ValidatingFunctions.verifyFields,
+    ValidatingFunctions.verifyToken,
+    async function(req,res){
     let [levels] = await dbP.execute("SELECT * FROM `level` WHERE server_id=?;",[req.query.serverId]);
 
-    let [levels_attributes] = await dbP.execute("SELECT `levels_attributes`.id, lvl_id, `level`.num, attribute.`name`, `value` FROM `levels_attributes` " +
-                                                "LEFT JOIN `level` ON lvl_id=`level`.id " +
-                                                "LEFT JOIN attribute ON attribute_id=attribute.id " +
-                                                "WHERE `level`.server_id = ? " +
-                                                "ORDER BY `level`.num;",
+    let [levels_attributes] = await dbP.execute("SELECT `levels_attributes`.id, lvl_id, `level`.num, " +
+                                                    "attribute.`name`, `value` FROM `levels_attributes` " +
+                                                    "LEFT JOIN `level` ON lvl_id=`level`.id " +
+                                                    "LEFT JOIN attribute ON attribute_id=attribute.id " +
+                                                    "WHERE `level`.server_id = ? " +
+                                                    "ORDER BY `level`.num;",
         [req.query.serverId]);
 
     res.send({levels:levels, levels_attributes:levels_attributes});
@@ -881,7 +987,8 @@ app.post("/characters",
     body("serverId").isInt(),
     body("attributes").toArray().isArray({min:1}),
     body("attributes").toArray().isArray(),
-    verifyFields,verifyToken,
+    ValidatingFunctions.verifyFields,
+    ValidatingFunctions.verifyToken,
     async function(req,res){
         let [currentCharacter] = await dbP.execute("SELECT character_id FROM users_servers WHERE server_id = ? AND user_id = ?;",[req.body.serverId,req.userId]);
         if (currentCharacter[0].character_id != null) {
@@ -914,14 +1021,18 @@ app.post("/characters",
  * Одобрить анкету персонажа
  * @param query.characterId
  */
-app.put("/character_confirm",query("characterId").isInt(),verifyFields,verifyToken,async function(req,res){
+app.put("/character_confirm",
+    query("characterId").isInt(),
+    ValidatingFunctions.verifyFields,
+    ValidatingFunctions.verifyToken,
+    async function(req,res){
 
     // Получение Id сервера, на котором утверждается персонаж
     let [serverId] = await dbP.execute("SELECT server_id FROM `character` WHERE id=?;",[req.query.characterId]);
     serverId = serverId[0].server_id;
 
     // Проверка прав доступа утверждения анкет
-    let permission = await checkRights("is_gm",req.userId,serverId);
+    let permission = await ValidatingFunctions.checkRights("is_gm",req.userId,serverId);
     if(!permission){
         res.status(403).send({error:"access denied"});
         return;
@@ -953,14 +1064,15 @@ app.put("/character_confirm",query("characterId").isInt(),verifyFields,verifyTok
  */
 app.put("/character_reject",
     body("characterId").isInt(),
-    verifyFields,verifyToken,
+    ValidatingFunctions.verifyFields,
+    ValidatingFunctions.verifyToken,
     async function(req,res){
         // Получение Id сервера, на котором отклоняется персонаж
         let [serverId] = await dbP.execute("SELECT server_id FROM `character` WHERE id=?;",[req.body.characterId]);
         serverId = serverId[0].server_id;
 
         // Проверка прав доступа отклонения анкет
-        let permission = await checkRights("is_gm",req.userId,serverId);
+        let permission = await ValidatingFunctions.checkRights("is_gm",req.userId,serverId);
         if(!permission){
             res.status(403).send({error:"access denied"});
             return;
@@ -988,7 +1100,8 @@ app.put("/characters",
     body("biography").isString().isLength({min:1}),
     body("temper").isString().isLength({min:1}),
     body("characterId").isInt(),
-    verifyFields,verifyToken,
+    ValidatingFunctions.verifyFields,
+    ValidatingFunctions.verifyToken,
     async function(req,res){
         dbP.query("UPDATE `character` SET name=?, biography=?, temper=?, extra=?, age=? WHERE id=?;",
             [req.body.name,req.body.biography,req.body.temper,req.body.extra ?? null,req.body.age,req.body.characterId],
@@ -999,7 +1112,12 @@ app.put("/characters",
 
 )
 
-app.get("/characters",query("serverId").isInt(),verifyFields,verifyToken,async function (req,res){
+app.get("/characters",
+    query("serverId").isInt(),
+    ValidatingFunctions.verifyFields,
+    ValidatingFunctions.verifyToken,
+    async function (req,res){
+
     let [data] = await dbP.execute("SELECT characters_attributes.*, u0860595_rp_ruler.character.server_id FROM characters_attributes INNER JOIN u0860595_rp_ruler.character ON character_id=u0860595_rp_ruler.character.id WHERE users_servers.server_id = ?",
         [req.userId,req.query.serverId]);
     let character = data[0];
@@ -1015,10 +1133,15 @@ app.get("/characters",query("serverId").isInt(),verifyFields,verifyToken,async f
     res.send({character:data[0]});
 })
 
-app.delete("/characters",query("characterId").isInt(),verifyFields,verifyToken,async function (req,res){
+app.delete("/characters",
+    query("characterId").isInt(),
+    ValidatingFunctions.verifyFields,
+    ValidatingFunctions.verifyToken,
+    async function (req,res){
+
     let [serverId] = await dbP.execute("SELECT server_id FROM users_servers WHERE character_id=?",[req.query.characterId]);
     serverId = serverId[0].server_id;
-    let permission = await checkRights("is_gm",req.userId,serverId);
+    let permission = await ValidatingFunctions.checkRights("is_gm",req.userId,serverId);
     if(!permission){
         res.status(403).send({error:"access denied"});
         return;
@@ -1030,7 +1153,12 @@ app.delete("/characters",query("characterId").isInt(),verifyFields,verifyToken,a
 /**
  * Получить всех персонажей (в т. ч. анкеты) с последним актуальным ответом администрации (ГМов)
  */
-app.get("/characters_all",query("serverId").isInt(),verifyFields,verifyToken,async function (req,res){
+app.get("/characters_all",
+    query("serverId").isInt(),
+    ValidatingFunctions.verifyFields,
+    ValidatingFunctions.verifyToken,
+    async function (req,res){
+
     let [characters] = await dbP.execute("SELECT `character`.id, `character`.characterName, user_owner.login AS `owner`, `character`.last_edit, " +
                                          "`character`.is_confirmed, `character`.is_rejected, `character`.is_frozen, " +
                                          "comment_author.login AS author, " +
@@ -1050,7 +1178,12 @@ app.get("/characters_all",query("serverId").isInt(),verifyFields,verifyToken,asy
  * @param serverId - id сервера
  * @param characterId - id персонажа
  */
-app.get("/character_by_id",query("serverId").isInt(),verifyFields,verifyToken,async function (req,res){
+app.get("/character_by_id",
+    query("serverId").isInt(),
+    ValidatingFunctions.verifyFields,
+    ValidatingFunctions.verifyToken,
+    async function (req,res){
+
     let [character] = await dbP.execute("SELECT * FROM `character` WHERE id=?;", [req.query.characterId])
     let [attributes] = await dbP.execute("SELECT `name`, `type`, short_value, long_value, isGeneral FROM characters_attributes " +
                                          "LEFT JOIN attribute ON attribute_id=attribute.id " +
@@ -1070,7 +1203,12 @@ app.get("/character_by_id",query("serverId").isInt(),verifyFields,verifyToken,as
  * Получить информацию об одном персонаже по id владельца
  * @param serverId - id сервера
  */
-app.get("/character_by_user_id",query("serverId").isInt(),verifyFields,verifyToken,async function (req,res){
+app.get("/character_by_user_id",
+    query("serverId").isInt(),
+    ValidatingFunctions.verifyFields,
+    ValidatingFunctions.verifyToken,
+    async function (req,res){
+
     let [character] = await dbP.execute("SELECT * FROM `character` WHERE user_id=?;", [req.userId])
     let [attributes] = await dbP.execute("SELECT `name`, `type`, short_value, long_value, isGeneral FROM characters_attributes " +
                                          "LEFT JOIN attribute ON attribute_id=attribute.id " +
@@ -1088,45 +1226,29 @@ app.get("/character_by_user_id",query("serverId").isInt(),verifyFields,verifyTok
     res.send({character:character[0], attributes:attributes, responds:responds});
 })
 
-app.put("/characters_comment",body("characterId").isInt(),body("comment").isString(),verifyFields,verifyToken,async function (req,res){
+app.put("/characters_comment",
+    body("characterId").isInt(),
+    body("comment").isString(),
+    ValidatingFunctions.verifyFields,
+    ValidatingFunctions.verifyToken,
+    async function (req,res){
+
     let [data] = await dbP.execute("UPDATE `character` SET comment = ? WHERE id=?",
         [req.body.comment,req.body.characterId]);
     res.send({success:1});
 })
 
-app.put("/characters_exp",body("characterId").isInt(),body("exp").isInt(),verifyFields,verifyToken,async function (req,res){
+app.put("/characters_exp",
+    body("characterId").isInt(),
+    body("exp").isInt(),
+    ValidatingFunctions.verifyFields,
+    ValidatingFunctions.verifyToken,
+    async function (req,res){
+
     let [data] = await dbP.execute("UPDATE `character` SET exp = ? WHERE id=?",
         [req.body.exp,req.body.characterId]);
     res.send({success:1});
 })
-
-async function checkRights(right,userId,serverId){
-    let [adminServer] = await dbP.execute("SELECT * FROM server WHERE admin_id=? AND id=?",[userId,serverId]);
-    let [roles] = await dbP.execute("SELECT role.* FROM users_servers JOIN role ON role.id=users_servers.role_id\n" +
-        "                                    WHERE users_servers.server_id=? AND users_servers.user_id=?",[serverId,userId]);
-    if(roles.length === 0 && adminServer.length === 0)return false;
-    return roles[0][right] == 1 || adminServer.length !== 0;
-}
-
-function verifyToken(req,res,next){
-    db.query("SELECT id FROM user WHERE token=?",[req.token], function(err, data) {
-        if(err != null || data.length === 0){
-            res.status(403).send({"error":"invalid token"});
-        }else{
-            req.userId = data[0].id;
-            next();
-        }
-    });
-}
-
-function verifyFields(req,res,next){
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-        return res.status(400).json({ error: errors.array() });
-    }else{
-        next();
-    }
-}
 
 
 app.listen(80, () => {
