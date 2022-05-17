@@ -764,37 +764,35 @@ app.get("/roles",
 app.post("/upload_avatar",
     ValidatingFunctions.verifyToken,
     async function(req,res){
+        const newName = require('crypto').randomBytes(10).toString('hex') +"."+ req.files.avatar.name.split(".").pop();
 
-    const newName = require('crypto').randomBytes(10).toString('hex') +"."+ req.files.avatar.name.split(".").pop();
+        fs.rename(req.files.avatar.tempFilePath,"upload/"+newName,(err)=>{});
 
-    fs.rename(req.files.avatar.tempFilePath,"upload/"+newName,(err)=>{});
+        //req.files.avatar.mv('./upload/' + newName);
 
-    req.files.avatar.mv('./upload/' + newName);
+        dbP.execute("UPDATE user SET avatar=? WHERE id=?",[newName,req.userId]);
 
-    dbP.execute("UPDATE user SET avatar=? WHERE id=?",[newName,req.userId]);
-
-    let currentRoom = null;
-    for(let clientId in clients){
-        if(clients[clientId].userId == req.userId){
-            currentRoom = clients[clientId].roomId;
-            break;
+        let currentRoom = null;
+        for(let clientId in clients){
+            if(clients[clientId].userId == req.userId){
+                currentRoom = clients[clientId].roomId;
+                break;
+            }
         }
-    }
-    emitUpdateUsers(currentRoom);
+        emitUpdateUsers(currentRoom);
 
-    res.send({avatar:newName});
+        res.send({avatar:newName});
 
 })
 
 app.post("/upload_file",
     ValidatingFunctions.verifyToken,
     async function(req,res){
+        const newName = require('crypto').randomBytes(10).toString('hex') +"."+ req.files.file.name.split(".").pop();
 
-    const newName = require('crypto').randomBytes(10).toString('hex') +"."+ req.files.file.name.split(".").pop();
+        fs.rename(req.files.file.tempFilePath,"upload/"+newName,(err)=>{});
 
-    fs.rename(req.files.file.tempFilePath,"upload/"+newName,(err)=>{});
-
-    res.send({filename:newName});
+        res.send({filename:newName});
 })
 
 /** ========== Взаимодействие с аттрибутами персонажей на сервере ========== */
@@ -874,32 +872,12 @@ app.post("/characters",
     body("attributes").toArray().isArray(),
     ValidatingFunctions.verifyFields,
     ValidatingFunctions.verifyToken,
-    async function(req,res){
-        let [currentCharacter] = await dbP.execute("SELECT character_id FROM users_servers WHERE server_id = ? AND user_id = ?;",[req.body.serverId,req.userId]);
-        if (currentCharacter[0].character_id != null) {
-            res.send({error:"Персонаж уже существует", data:currentCharacter[0].character_id});
-            return;
-        }
+    GameMechanics.addCharacter
+)
 
-        // Добавляем персонажа в БД
-        db.query("INSERT INTO `character` VALUES (NULL,?,?,?,0,0,0,?);",
-            [req.body.characterName, req.userId, req.body.serverId, req.body.date],
-            async function(err,result) {
-                // Заносим значения аттрибутов из анкеты
-                let characterId = result.insertId;
-                let attributes = JSON.parse(req.body.attributes);
-                attributes.forEach((attribute, order) => {
-                    if (attribute.type == "text")
-                        dbP.execute("INSERT INTO characters_attributes VALUES(NULL,?,?,NULL,?);",
-                            [characterId, attribute.id, attribute.value]);
-                    else
-                        dbP.execute("INSERT INTO characters_attributes VALUES(NULL,?,?,?,NULL);",
-                            [characterId, attribute.id, attribute.value]);
-                })
-                // await dbP.execute("UPDATE users_servers SET character_id=? WHERE server_id = ? AND user_id=? ;",[characterId,req.body.serverId,req.userId]);
-            }
-        )
-    }
+app.post("/upload_character_avatar",
+    ValidatingFunctions.verifyToken,
+    GameMechanics.uploadCharacterAvatar
 )
 
 /**

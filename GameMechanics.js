@@ -11,6 +11,7 @@ const db = mysql.createPool({
 const dbP = db.promise();
 
 const ValidatingFunctions = require('./ValidatingFunctions');
+const fs = require("fs");
 
 module.exports = {
 
@@ -137,5 +138,55 @@ module.exports = {
             [req.query.serverId]);
 
         res.send({levels:levels, levels_attributes:levels_attributes});
+    },
+
+    /** ========== Взаимодействие с игровыми персонажами ========== */
+
+    addCharacter : async function(req,res) {
+        let [currentCharacter] = await dbP.execute("SELECT character_id FROM users_servers WHERE server_id = ? AND user_id = ?;",[req.body.serverId,req.userId]);
+        if (currentCharacter[0].character_id != null) {
+            res.send({error:"Персонаж уже существует", data:currentCharacter[0].character_id});
+            return;
+        }
+
+        // Добавляем персонажа в БД
+        db.query("INSERT INTO `character` VALUES (NULL,?,?,?,0,0,0,?);",
+            [req.body.characterName, req.userId, req.body.serverId, req.body.date],
+            async function(err,result) {
+                // Заносим значения аттрибутов из анкеты
+                let characterId = result.insertId;
+                let attributes = JSON.parse(req.body.attributes);
+                attributes.forEach((attribute, order) => {
+                    if (attribute.type == "text")
+                        dbP.execute("INSERT INTO characters_attributes VALUES(NULL,?,?,NULL,?);",
+                            [characterId, attribute.id, attribute.value]);
+                    else
+                        dbP.execute("INSERT INTO characters_attributes VALUES(NULL,?,?,?,NULL);",
+                            [characterId, attribute.id, attribute.value]);
+                })
+                // await dbP.execute("UPDATE users_servers SET character_id=? WHERE server_id = ? AND user_id=? ;",[characterId,req.body.serverId,req.userId]);
+            }
+        )
+    },
+
+    uploadCharacterAvatar : async function(req,res) {
+
+        let [owner] = await dbP.execute("SELECT user_id FROM `character` WHERE id=?", [req.query.characterId]);
+        owner = owner[0].user_id;
+        if (owner != req.userId) {
+
+            res.status(403).send({error:"access denied"});
+        }
+        else {
+
+            const newName = require('crypto').randomBytes(10).toString('hex') +"."+ req.files.character_avatar.name.split(".").pop();
+
+            fs.rename(req.files.character_avatar.tempFilePath,"upload/"+newName,(err)=>{});
+
+            dbP.execute("UPDATE `character` SET avatar=? WHERE user_id=?",[newName,req.userId]);
+
+            res.send({character_avatar:newName});
+        }
+
     }
 }
