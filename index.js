@@ -861,7 +861,7 @@ app.get("/levels",
 
 /**
  * Создание персонажа игроком (подача анкеты)
- * @param body.server_id -
+ * @param body.serverId - id сервера, на котором создаётся персонаж
  * @param body.characterName - Имя персонажа
  * @param body.date - Дата создания персонажа
  * @param body.attributes - аттрибуты со значениями персонажа
@@ -873,6 +873,16 @@ app.post("/characters",
     ValidatingFunctions.verifyFields,
     ValidatingFunctions.verifyToken,
     GameMechanics.addCharacter
+)
+
+/**
+ * Удалить персонажа
+ */
+app.delete("/characters",
+    query("characterId").isInt(),
+    ValidatingFunctions.verifyFields,
+    ValidatingFunctions.verifyToken,
+    GameMechanics.deleteCharacter
 )
 
 app.post("/upload_character_avatar",
@@ -994,23 +1004,6 @@ app.get("/characters",
     character.nextExp = nextLevel?.exp ?? 9999999;
     character.prevExp = level?.exp;
     res.send({character:data[0]});
-})
-
-app.delete("/characters",
-    query("characterId").isInt(),
-    ValidatingFunctions.verifyFields,
-    ValidatingFunctions.verifyToken,
-    async function (req,res){
-
-    let [serverId] = await dbP.execute("SELECT server_id FROM users_servers WHERE character_id=?",[req.query.characterId]);
-    serverId = serverId[0].server_id;
-    let permission = await ValidatingFunctions.checkRights("is_gm",req.userId,serverId);
-    if(!permission){
-        res.status(403).send({error:"access denied"});
-        return;
-    }
-    await dbP.execute("DELETE FROM `character` WHERE id=?",[req.query.characterId]);
-    res.send({success:1});
 })
 
 /**

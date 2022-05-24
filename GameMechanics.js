@@ -150,23 +150,35 @@ module.exports = {
         }
 
         // Добавляем персонажа в БД
-        db.query("INSERT INTO `character` VALUES (NULL,?,?,?,0,0,0,?);",
-            [req.body.characterName, req.userId, req.body.serverId, req.body.date],
+        db.query("INSERT INTO `character` VALUES (NULL,?,?,?,0,0,0,?,?,NULL,NULL);",
+            [req.body.characterName, req.userId, req.body.serverId, req.body.date, req.body.character_avatar],
             async function(err,result) {
                 // Заносим значения аттрибутов из анкеты
                 let characterId = result.insertId;
                 let attributes = JSON.parse(req.body.attributes);
                 attributes.forEach((attribute, order) => {
                     if (attribute.type == "text")
-                        dbP.execute("INSERT INTO characters_attributes VALUES(NULL,?,?,NULL,?);",
+                        dbP.execute("INSERT INTO characters_attributes VALUES(NULL,?,?,NULL,?,NULL);",
                             [characterId, attribute.id, attribute.value]);
                     else
-                        dbP.execute("INSERT INTO characters_attributes VALUES(NULL,?,?,?,NULL);",
+                        dbP.execute("INSERT INTO characters_attributes VALUES(NULL,?,?,?,NULL,NULL);",
                             [characterId, attribute.id, attribute.value]);
                 })
                 // await dbP.execute("UPDATE users_servers SET character_id=? WHERE server_id = ? AND user_id=? ;",[characterId,req.body.serverId,req.userId]);
             }
         )
+        res.send({success: 1});
+    },
+
+    deleteCharacter : async function(req, res) {
+        let [user_id] = await dbP.execute("SELECT user_id FROM `character` WHERE id=?;", [req.query.characterId]);
+        if (req.userId != user_id[0].user_id) {
+            res.status(403).send({error:"access denied"});
+            return;
+        }
+
+        dbP.execute("DELETE FROM `character` WHERE id=?;", [req.query.characterId]);
+        res.send({success: 1})
     },
 
     uploadCharacterAvatar : async function(req,res) {
