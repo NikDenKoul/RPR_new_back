@@ -409,8 +409,8 @@ app.post("/rooms",
         res.status(403).send({error:"access denied"});
         return;
     }
-    await dbP.execute("INSERT INTO room VALUES(NULL,?,?,?,?,?,NULL,NULL,0,CURRENT_TIMESTAMP,NULL,0)",
-        [req.body.name,req.body.description,req.body.icon ?? "chat",req.body.bg ?? null,req.body.serverId]);
+    await dbP.execute("INSERT INTO room VALUES(NULL,?,?,?,?,?,NULL,NULL,0,CURRENT_TIMESTAMP,NULL,0,?)",
+        [req.body.name,req.body.description,req.body.icon ?? "chat",req.body.bg ?? null,req.body.serverId,req.body.is_location]);
     emitUpdateRooms(req.body.serverId);
     res.send({success:1});
 })
@@ -664,8 +664,8 @@ app.put("/rooms",
             res.status(403).send({error:"access denied"});
             return;
         }
-        dbP.execute("UPDATE room SET name=?,description=?,bg=?,icon=? WHERE id=?",
-            [req.body.name,req.body.description ?? "",req.body.bg ?? "",req.body.icon ?? "chat",req.body.roomId]);
+        dbP.execute("UPDATE room SET name=?,description=?,bg=?,icon=?, is_location=? WHERE id=?",
+            [req.body.name,req.body.description ?? "",req.body.bg ?? "",req.body.icon ?? "chat",req.body.is_location,req.body.roomId]);
         emitUpdateRooms(req.body.serverId);
         res.send({success:1});
 })
