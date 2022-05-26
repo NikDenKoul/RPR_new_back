@@ -858,6 +858,24 @@ app.get("/levels",
     GameMechanics.getLevels
 )
 
+app.put("/posts_rating",
+    body("serverId").isInt(),
+    body("postsRating").toArray().isArray({min:1}),
+    body("postsRating").toArray().isArray(),
+    body("deletedIds").toArray().isArray({min:1}),
+    body("deletedIds").toArray().isArray(),
+    ValidatingFunctions.verifyFields,
+    ValidatingFunctions.verifyToken,
+    GameMechanics.editPostsRating
+)
+
+app.get("/posts_rating",
+    query("serverId").isInt(),
+    ValidatingFunctions.verifyFields,
+    ValidatingFunctions.verifyToken,
+    GameMechanics.getPostsRating
+)
+
 /** ========== Взаимодействие с игровыми персонажами ========== */
 
 /**
@@ -923,7 +941,7 @@ app.put("/character_confirm",
                                          "LEFT JOIN level ON lvl_id=level.id " +
                                          "WHERE level.server_id=? AND level.num=1;",[serverId]);
     attributes.forEach((attribute) => {
-        dbP.execute("INSERT INTO characters_attributes VALUES(NULL,?,?,?,NULL);",[req.query.characterId,attribute.attribute_id,attribute.value])
+        dbP.execute("INSERT INTO characters_attributes VALUES(NULL,?,?,?,NULL,?);",[req.query.characterId,attribute.attribute_id,attribute.value,attribute.value])
     })
 
     // Посылаем ответ об успехе
@@ -985,27 +1003,6 @@ app.put("/characters",
     }
 
 )
-
-app.get("/characters",
-    query("serverId").isInt(),
-    ValidatingFunctions.verifyFields,
-    ValidatingFunctions.verifyToken,
-    async function (req,res){
-
-    let [data] = await dbP.execute("SELECT characters_attributes.*, u0860595_rp_ruler.character.server_id FROM characters_attributes INNER JOIN u0860595_rp_ruler.character ON character_id=u0860595_rp_ruler.character.id WHERE users_servers.server_id = ?",
-        [req.userId,req.query.serverId]);
-    let character = data[0];
-    let [level] = await dbP.execute("SELECT t.* FROM (SELECT * FROM level WHERE server_id = ? ORDER BY exp DESC) t WHERE exp <= ? LIMIT 1",[req.query.serverId,character.exp]);
-    level = level[0];
-    let [nextLevel] = await dbP.execute("SELECT t.* FROM (SELECT * FROM level WHERE server_id = ? ORDER BY exp ASC) t WHERE exp > ? LIMIT 1",[req.query.serverId,character.exp]);
-    nextLevel = nextLevel[0];
-    character.mp = level?.mp ?? 1;
-    character.hp = level?.hp ?? 1;
-    character.level = level?.number ?? 0;
-    character.nextExp = nextLevel?.exp ?? 9999999;
-    character.prevExp = level?.exp;
-    res.send({character:data[0]});
-})
 
 /**
  * Получить всех персонажей (в т. ч. анкеты) с последним актуальным ответом администрации (ГМов)

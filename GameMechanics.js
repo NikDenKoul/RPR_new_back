@@ -140,6 +140,49 @@ module.exports = {
         res.send({levels:levels, levels_attributes:levels_attributes});
     },
 
+    /**
+     * Получить распределение награды по всем категориям и размерам постов
+     */
+    getPostsRating : async function(req,res) {
+        let [posts_rating] = await dbP.execute("SELECT * FROM posts_rating WHERE server_id=?;",[req.query.serverId]);
+
+        res.send({posts_rating: posts_rating});
+    },
+
+    editPostsRating : async function(req,res) {
+        let posts_rating = JSON.parse(req.body.postsRating);
+        let deletedIds = JSON.parse(req.body.deletedIds);
+        let serverId = req.body.serverId;
+
+        // Проверка прав доступа для редактирования распределения наград за посты
+        let permission = await ValidatingFunctions.checkRights("is_gm",req.userId,serverId);
+        if(!permission){
+            res.status(403).send({error:"access denied"});
+            return;
+        }
+
+        //let prev_upper_limit = -1;
+        // Изменение набора уровней на сервере
+        posts_rating.forEach((rating, order) => {
+                if (rating.id <= 0) {
+                    dbP.execute("INSERT INTO posts_rating VALUES (NULL,?,?,?,?,?,?);",
+                        [serverId, rating.name, rating.lower_limit, rating.upper_limit, rating.exp_for_routine, rating.exp_for_plot]);
+                }
+
+                else {
+                    dbP.execute("UPDATE posts_rating SET server_id=?, name=?, lower_limit=?, upper_limit=?, exp_for_routine=?, exp_for_plot=? WHERE id=?;",
+                        [serverId, rating.name, rating.lower_limit, rating.upper_limit, rating.exp_for_routine, rating.exp_for_plot, rating.id]);
+                }
+            }
+        )
+
+        deletedIds.forEach((rating_id) => {
+            dbP.execute("DELETE FROM posts_rating WHERE id=?",[rating_id]);
+        })
+
+        res.send({success:1});
+    },
+
     /** ========== Взаимодействие с игровыми персонажами ========== */
 
     addCharacter : async function(req,res) {

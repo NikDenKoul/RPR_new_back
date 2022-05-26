@@ -19,7 +19,7 @@ module.exports = {
      */
     getPosts: async function(req,res) {
         let [posts] = await dbP.execute("SELECT room.name, `character`.id AS characterId, `character`.characterName, " +
-                                            "`character`.avatar, message.text, message.datetime FROM message " +
+                                            "`character`.avatar, message.id AS post_id, message.text, message.datetime FROM message " +
                                             "INNER JOIN `room` ON room_id=room.id " +
                                             "INNER JOIN `user` ON sender_id=`user`.id " +
                                             "INNER JOIN `character` ON `user`.id = `character`.user_id " +
