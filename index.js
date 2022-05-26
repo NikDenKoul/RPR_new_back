@@ -58,8 +58,9 @@ app.use(express.urlencoded({ extended: true}));
 
 app.use(bearerToken());
 
-const GameMechanics = require('./GameMechanics');
 const ValidatingFunctions = require('./ValidatingFunctions');
+const GameMechanics = require('./GameMechanics');
+const ExpModer = require('./ExpModeration');
 
 const db = mysql.createPool({
     connectionLimit: 15,
@@ -1105,6 +1106,14 @@ app.put("/characters_exp",
         [req.body.exp,req.body.characterId]);
     res.send({success:1});
 })
+
+/** */
+app.get("/exp_moder",
+    query("serverId").isInt(),
+    ValidatingFunctions.verifyFields,
+    ValidatingFunctions.verifyToken,
+    ExpModer.getPosts
+)
 
 
 app.listen(80, () => {
