@@ -138,6 +138,10 @@ io.on('connection', (socket) => {
             [curRoomId+"",userId+"",message.reply_id,decodeURIComponent(message.text)],async function(err,data){
                 if(err!=null)console.log(err);
                 let messageId = data.insertId;
+
+                let [is_location] = await dbP.execute("SELECT is_location FROM room WHERE id=?;",[curRoomId]);
+                if (is_location[0].is_location === 1) dbP.execute("INSERT INTO game_post VALUES(NULL,?,0)",[messageId]);
+
                 //записываем в комнату id последнего сообщения
                 dbP.execute("UPDATE room SET last_msg_id=?,last_msg_time=CURRENT_TIMESTAMP WHERE id=?",[messageId,curRoomId]);
                 //отмечаем прочитанным для отправителя
@@ -1110,6 +1114,15 @@ app.get("/exp_moder",
     ValidatingFunctions.verifyFields,
     ValidatingFunctions.verifyToken,
     ExpModer.getPosts
+)
+
+app.put("/exp_moder",
+    body("serverId").isInt(),
+    body("posts").toArray().isArray({min:1}),
+    body("posts").toArray().isArray(),
+    ValidatingFunctions.verifyFields,
+    ValidatingFunctions.verifyToken,
+    ExpModer.giveExpForPosts
 )
 
 
