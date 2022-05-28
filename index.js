@@ -880,6 +880,15 @@ app.get("/posts_rating",
     GameMechanics.getPostsRating
 )
 
+/** ========== Взаимодействие с ситемой сражений ========== */
+
+app.get("/fight_actions",
+    query("serverId").isInt(),
+    ValidatingFunctions.verifyFields,
+    ValidatingFunctions.verifyToken,
+    GameMechanics.getActions
+)
+
 /** ========== Взаимодействие с игровыми персонажами ========== */
 
 /**

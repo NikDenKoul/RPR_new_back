@@ -183,6 +183,21 @@ module.exports = {
         res.send({success:1});
     },
 
+    /** ========== Взаимодействие с ситемой сражений ========== */
+
+    getActions : async function(req,res) {
+        let [actions] = await dbP.execute("SELECT action.id, action.server_id, action.name, action.AP_cost, " +
+            "target_attribute.name AS attribute_name, effect.attribute_owner, " +
+            "effect.effect_type, value_attribute.name AS value_attribute, " +
+            "effect.value_const, effect.value_operator FROM action " +
+            "LEFT JOIN `effect` ON effect_id=effect.id " +
+            "LEFT JOIN attribute AS target_attribute ON effect.attribute_id=target_attribute.id " +
+            "LEFT JOIN attribute AS value_attribute ON effect.value_attribute_id=value_attribute.id " +
+            "WHERE action.server_id=?",[req.query.serverId]);
+
+        res.send({actions:actions});
+    },
+
     /** ========== Взаимодействие с игровыми персонажами ========== */
 
     addCharacter : async function(req,res) {
