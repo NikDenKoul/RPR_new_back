@@ -98,7 +98,7 @@ module.exports = {
         levels.forEach((level, order) => {
                 // Добавление нового уровня (т. к. id'шник был нулевой, присваивается новый)
                 if (level.id <= 0) {
-                    db.query("INSERT INTO level VALUES (NULL, ?, ?, ?);",[level.num, level.required_exp, serverId],async function(err,data){
+                    db.query("INSERT INTO level VALUES (NULL, ?, ?, ?, ?);",[level.num, level.required_exp, level.AP, serverId],async function(err,data){
                         let lvl_id = data.insertId
                         attributes.forEach((attribute) => {
                             dbP.execute("INSERT INTO levels_attributes VALUES (NULL,?,?,?);",[lvl_id,attribute.id,level[attribute.name]]);
@@ -107,8 +107,8 @@ module.exports = {
                 }
                 // Обновление существующего уровня
                 else {
-                    dbP.execute("UPDATE level SET num=?, required_exp=?, server_id=? WHERE id=?;",
-                        [level.num, level.required_exp, serverId, level.id]);
+                    dbP.execute("UPDATE level SET num=?, required_exp=?, AP=?, server_id=? WHERE id=?;",
+                        [level.num, level.required_exp, level.AP, serverId, level.id]);
                     attributes.forEach((attribute) => {
                         dbP.execute("UPDATE levels_attributes SET value=? WHERE lvl_id=? AND attribute_id=?;",[level[attribute.name],level.id,attribute.id]);
                     })
