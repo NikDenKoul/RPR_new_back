@@ -802,6 +802,13 @@ app.post("/upload_file",
 
 /** ========== Взаимодействие с аттрибутами персонажей на сервере ========== */
 
+app.get("/game_settings",
+    query("serverId").isInt(),
+    ValidatingFunctions.verifyFields,
+    ValidatingFunctions.verifyToken,
+    GameMechanics.getGameSettings
+)
+
 /**
  * Обновить набор аттрибутов
  * @param body.serverId - id сервера, на котором проводятся изменения

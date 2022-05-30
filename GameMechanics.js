@@ -15,6 +15,13 @@ const fs = require("fs");
 
 module.exports = {
 
+    getGameSettings : async function(req, res) {
+        let [game_settings] = await dbP.execute("SELECT * FROM game_settings WHERE server_id=?;",[req.query.serverId]);
+        game_settings = game_settings[0];
+
+        res.send({game_settings: game_settings});
+    },
+
     /** ========== Взаимодействие с аттрибутами персонажей на сервере ========== */
 
     /**
