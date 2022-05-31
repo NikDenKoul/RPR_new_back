@@ -1058,7 +1058,10 @@ app.get("/character_by_id",
     ValidatingFunctions.verifyToken,
     async function (req,res){
 
-    let [character] = await dbP.execute("SELECT * FROM `character` WHERE id=?;", [req.query.characterId])
+    let [character] = await dbP.execute("SELECT `character`.*, `level`.required_exp FROM `character` " +
+        "LEFT JOIN `level` ON `character`.server_id=`level`.server_id " +
+        "WHERE `character`.id=? AND (`level`.num=`character`.level+1 OR is_confirmed=0 AND `level`.num=1);",
+        [req.query.characterId])
     let [attributes] = await dbP.execute("SELECT `name`, `type`, short_value, long_value, current_value, isGeneral " +
                                          "FROM characters_attributes " +
                                          "LEFT JOIN attribute ON attribute_id=attribute.id " +
@@ -1084,7 +1087,10 @@ app.get("/character_by_user_id",
     ValidatingFunctions.verifyToken,
     async function (req,res){
 
-    let [character] = await dbP.execute("SELECT * FROM `character` WHERE user_id=?;", [req.userId])
+    let [character] = await dbP.execute("SELECT `character`.*, `level`.required_exp FROM `character` " +
+        "LEFT JOIN `level` ON `character`.server_id=`level`.server_id " +
+        "WHERE `character`.user_id=? AND (`level`.num=`character`.level+1 OR is_confirmed=0 AND `level`.num=1);",
+        [req.userId])
     let [attributes] = await dbP.execute("SELECT `name`, `type`, short_value, long_value, current_value, isGeneral " +
                                          "FROM characters_attributes " +
                                          "LEFT JOIN attribute ON attribute_id=attribute.id " +
