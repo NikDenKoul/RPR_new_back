@@ -49,62 +49,60 @@ module.exports = {
 
         for (const posts_set of posts) {
 
-            let [character] = await dbP.execute("SELECT level, exp FROM `character` WHERE id=?;",[posts_set.id]);
+            let [character] = await dbP.execute("SELECT level, exp, AP FROM `character` WHERE id=?;",[posts_set.id]);
             let character_exp = character[0].exp;
             let character_lvl = character[0].level;
+            let character_AP = character[0].AP;
             let routine_posts_length = 0;
             let plot_posts_length = 0;
 
             // накапливаем суммарные размеры постов: отдельно за сюжетные и рутинные
             let posts_list = posts_set.posts_list;
-            // res.send({message: "catch", name: posts_set.characterName});
-            // return;
 
-            for (const post of posts_list) {
+            posts_list.forEach(post =>  {
 
                 if (post.is_plot) plot_posts_length += post.text.length;
                 else routine_posts_length += post.text.length;
 
-                await dbP.execute("UPDATE game_post SET is_checked=1 WHERE message_id=?",[post.id]);
-            }
-
+                dbP.execute("UPDATE game_post SET is_checked=1 WHERE message_id=?",[post.id]);
+            })
 
             // накапливаем опыт за посты
             let routine_lower_limit = 0;
             let plot_lower_limit = 0;
             posts_rating.forEach(rating => {
-                if (routine_posts_length >= routine_lower_limit && routine_posts_length <= rating.upper_limit) {
+                if (routine_posts_length > routine_lower_limit && routine_posts_length <= rating.upper_limit) {
                     character_exp += rating.exp_for_routine;
                 }
-                if (plot_posts_length >= plot_lower_limit && plot_posts_length <= rating.upper_limit) {
+                if (plot_posts_length > plot_lower_limit && plot_posts_length <= rating.upper_limit) {
                     character_exp += rating.exp_for_plot;
                 }
                 routine_lower_limit = rating.upper_limit;
                 plot_lower_limit = rating.upper_limit;
             })
-            if (character_exp == 0) {
-                res.send({error: "Could not calculate character experience"});
-                return;
-            }
 
             // повышаем уровень при необходимости
             levels.forEach(level => {
                 if ((level.num == character_lvl+1) && (level.required_exp <= character_exp)) {
                     character_lvl++;
                     character_exp -= level.required_exp;
+                    character_AP = level.AP;
                 }
             })
 
             // обновляем значения опыта и уровня персонажа
-            dbP.execute("UPDATE `character` SET exp=? WHERE id=?;",[character_exp,posts_set.id]);
+            dbP.query("UPDATE `character` SET `character`.level=?, `character`.exp=?, `character`.AP=? WHERE id=?;",
+                [character_lvl,character_exp,character_AP,posts_set.id]).then();
 
             // обновляем значения вторичных аттрибутов
             let [attributes] = await dbP.execute("SELECT attribute_id, value FROM levels_attributes " +
                                                "LEFT JOIN level ON lvl_id=level.id " +
                                                "WHERE level.server_id=? AND level.num=?;",
                 [req.body.serverId,character_lvl]);
+            // res.send({value_0: attributes[0]})
+            // return;
 
-            attributes.forEach((attribute) => {
+            attributes.forEach(attribute => {
                 dbP.execute("UPDATE characters_attributes SET short_value=?, current_value=? " +
                                 "WHERE character_id=? AND attribute_id=?;",
                     [attribute.value,attribute.value,posts_set.id,attribute.attribute_id])
