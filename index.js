@@ -1059,7 +1059,8 @@ app.get("/character_by_id",
     async function (req,res){
 
     let [character] = await dbP.execute("SELECT * FROM `character` WHERE id=?;", [req.query.characterId])
-    let [attributes] = await dbP.execute("SELECT `name`, `type`, short_value, long_value, isGeneral FROM characters_attributes " +
+    let [attributes] = await dbP.execute("SELECT `name`, `type`, short_value, long_value, current_value, isGeneral " +
+                                         "FROM characters_attributes " +
                                          "LEFT JOIN attribute ON attribute_id=attribute.id " +
                                          "WHERE character_id=? " +
                                          "ORDER BY isGeneral DESC, attribute_id;",
@@ -1084,7 +1085,8 @@ app.get("/character_by_user_id",
     async function (req,res){
 
     let [character] = await dbP.execute("SELECT * FROM `character` WHERE user_id=?;", [req.userId])
-    let [attributes] = await dbP.execute("SELECT `name`, `type`, short_value, long_value, isGeneral FROM characters_attributes " +
+    let [attributes] = await dbP.execute("SELECT `name`, `type`, short_value, long_value, current_value, isGeneral " +
+                                         "FROM characters_attributes " +
                                          "LEFT JOIN attribute ON attribute_id=attribute.id " +
                                          "LEFT JOIN `character` ON character_id=`character`.id " +
                                          "WHERE user_id=? " +
