@@ -170,15 +170,15 @@ module.exports = {
 
         //let prev_upper_limit = -1;
         // Изменение набора уровней на сервере
-        posts_rating.forEach((rating, order) => {
+        posts_rating.forEach((rating) => {
                 if (rating.id <= 0) {
-                    dbP.execute("INSERT INTO posts_rating VALUES (NULL,?,?,?,?,?,?);",
-                        [serverId, rating.name, rating.lower_limit, rating.upper_limit, rating.exp_for_routine, rating.exp_for_plot]);
+                    dbP.execute("INSERT INTO posts_rating VALUES (NULL,?,?,?,?,?);",
+                        [serverId, rating.name, rating.upper_limit, rating.exp_for_routine, rating.exp_for_plot]);
                 }
 
                 else {
-                    dbP.execute("UPDATE posts_rating SET server_id=?, name=?, lower_limit=?, upper_limit=?, exp_for_routine=?, exp_for_plot=? WHERE id=?;",
-                        [serverId, rating.name, rating.lower_limit, rating.upper_limit, rating.exp_for_routine, rating.exp_for_plot, rating.id]);
+                    dbP.execute("UPDATE posts_rating SET server_id=?, name=?, upper_limit=?, exp_for_routine=?, exp_for_plot=? WHERE id=?;",
+                        [serverId, rating.name, rating.upper_limit, rating.exp_for_routine, rating.exp_for_plot, rating.id]);
                 }
             }
         )

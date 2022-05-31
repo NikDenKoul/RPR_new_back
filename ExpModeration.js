@@ -70,13 +70,17 @@ module.exports = {
 
 
             // накапливаем опыт за посты
+            let routine_lower_limit = 0;
+            let plot_lower_limit = 0;
             posts_rating.forEach(rating => {
-                if (routine_posts_length >= rating.lower_limit && routine_posts_length <= rating.upper_limit) {
+                if (routine_posts_length >= routine_lower_limit && routine_posts_length <= rating.upper_limit) {
                     character_exp += rating.exp_for_routine;
                 }
-                if (plot_posts_length >= rating.lower_limit && plot_posts_length <= rating.upper_limit) {
+                if (plot_posts_length >= plot_lower_limit && plot_posts_length <= rating.upper_limit) {
                     character_exp += rating.exp_for_plot;
                 }
+                routine_lower_limit = rating.upper_limit;
+                plot_lower_limit = rating.upper_limit;
             })
             if (character_exp == 0) {
                 res.send({error: "Could not calculate character experience"});
