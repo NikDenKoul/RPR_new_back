@@ -1132,6 +1132,13 @@ app.put("/characters_exp",
     res.send({success:1});
 })
 
+app.get("/attack_settings",
+    query("serverId").isInt(),
+    ValidatingFunctions.verifyFields,
+    ValidatingFunctions.verifyToken,
+    GameMechanics.getAttackSettings
+)
+
 /** */
 app.get("/exp_moder",
     query("serverId").isInt(),

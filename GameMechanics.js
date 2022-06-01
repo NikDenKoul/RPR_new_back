@@ -265,5 +265,14 @@ module.exports = {
             res.send({character_avatar:newName});
         }
 
+    },
+
+    /** ========== Настройки системы сражений ========== */
+
+    getAttackSettings : async function(req,res) {
+        let [attack_settings_damage] = await dbP.execute("SELECT attribute.server_id, attack_settings.* FROM attack_settings " +
+            "LEFT JOIN attribute ON considered_attribute_id=attribute.id " +
+            "WHERE server_id=?;",[req.query.serverId]);
+        res.send({attack_settings_damage: attack_settings_damage});
     }
 }
