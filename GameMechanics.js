@@ -192,17 +192,36 @@ module.exports = {
 
     /** ========== Взаимодействие с ситемой сражений ========== */
 
-    getActions : async function(req,res) {
-        let [actions] = await dbP.execute("SELECT action.id, action.server_id, action.name, action.AP_cost, " +
-            "target_attribute.name AS attribute_name, effect.attribute_owner, " +
-            "effect.effect_type, value_attribute.name AS value_attribute, " +
-            "effect.value_const, effect.value_operator FROM action " +
-            "LEFT JOIN `effect` ON effect_id=effect.id " +
-            "LEFT JOIN attribute AS target_attribute ON effect.attribute_id=target_attribute.id " +
-            "LEFT JOIN attribute AS value_attribute ON effect.value_attribute_id=value_attribute.id " +
-            "WHERE action.server_id=?",[req.query.serverId]);
+    editAttackSettings : async function(req,res) {
 
-        res.send({actions:actions});
+        const attack_settings_damage = JSON.parse(req.body.attack_settings_damage);
+
+        for (const settings of attack_settings_damage) {
+            if (settings.id > 0) {
+                dbP.execute("UPDATE attack_settings SET effect_type=?, considered_attribute_id=?, " +
+                    "attribute_owner=? WHERE id=?;",
+                    [settings.effect_type,settings.considered_attribute_id, settings.attribute_owner,settings.id]);
+            }
+            else {
+                dbP.execute("INSERT INTO attack_settings VALUES(NULL,?,?,?);",
+                    [settings.effect_type,settings.considered_attribute_id,settings.attribute_owner]);
+            }
+        }
+
+        res.send({success: 1});
+    },
+
+    /**
+     * Получить настройки атаки
+     * @param req
+     * @param res
+     * @returns {Promise<void>}
+     */
+    getAttackSettings : async function(req,res) {
+        let [attack_settings_damage] = await dbP.execute("SELECT attribute.server_id, attack_settings.* FROM attack_settings " +
+            "LEFT JOIN attribute ON considered_attribute_id=attribute.id " +
+            "WHERE server_id=?;",[req.query.serverId]);
+        res.send({attack_settings_damage: attack_settings_damage});
     },
 
     /** ========== Взаимодействие с игровыми персонажами ========== */
@@ -265,14 +284,5 @@ module.exports = {
             res.send({character_avatar:newName});
         }
 
-    },
-
-    /** ========== Настройки системы сражений ========== */
-
-    getAttackSettings : async function(req,res) {
-        let [attack_settings_damage] = await dbP.execute("SELECT attribute.server_id, attack_settings.* FROM attack_settings " +
-            "LEFT JOIN attribute ON considered_attribute_id=attribute.id " +
-            "WHERE server_id=?;",[req.query.serverId]);
-        res.send({attack_settings_damage: attack_settings_damage});
     }
 }

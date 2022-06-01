@@ -889,11 +889,20 @@ app.get("/posts_rating",
 
 /** ========== Взаимодействие с ситемой сражений ========== */
 
-app.get("/fight_actions",
+app.put("/attack_settings",
+    body("serverId").isInt(),
+    body("attack_settings_damage").toArray().isArray({min:1}),
+    body("attack_settings_damage").toArray().isArray(),
+    ValidatingFunctions.verifyFields,
+    ValidatingFunctions.verifyToken,
+    GameMechanics.editAttackSettings
+)
+
+app.get("/attack_settings",
     query("serverId").isInt(),
     ValidatingFunctions.verifyFields,
     ValidatingFunctions.verifyToken,
-    GameMechanics.getActions
+    GameMechanics.getAttackSettings
 )
 
 /** ========== Взаимодействие с игровыми персонажами ========== */
@@ -1131,13 +1140,6 @@ app.put("/characters_exp",
         [req.body.exp,req.body.characterId]);
     res.send({success:1});
 })
-
-app.get("/attack_settings",
-    query("serverId").isInt(),
-    ValidatingFunctions.verifyFields,
-    ValidatingFunctions.verifyToken,
-    GameMechanics.getAttackSettings
-)
 
 /** */
 app.get("/exp_moder",
