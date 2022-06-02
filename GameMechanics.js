@@ -195,6 +195,7 @@ module.exports = {
     editAttackSettings : async function(req,res) {
 
         const attack_settings_damage = JSON.parse(req.body.attack_settings_damage);
+        const deleted_ids = JSON.parse(req.body.deleted_ids)
 
         for (const settings of attack_settings_damage) {
             if (settings.id > 0) {
@@ -206,6 +207,10 @@ module.exports = {
                 dbP.execute("INSERT INTO attack_settings VALUES(NULL,?,?,?);",
                     [settings.effect_type,settings.considered_attribute_id,settings.attribute_owner]);
             }
+        }
+
+        for (const id of deleted_ids) {
+            dbP.execute("DELETE FROM attack_settings WHERE id=?;",[id]);
         }
 
         res.send({success: 1});
