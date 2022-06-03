@@ -61,6 +61,7 @@ app.use(bearerToken());
 const ValidatingFunctions = require('./ValidatingFunctions');
 const GameMechanics = require('./GameMechanics');
 const ExpModer = require('./ExpModeration');
+const GameProcess = require('./GameProcess');
 
 const db = mysql.createPool({
     connectionLimit: 15,
@@ -1157,6 +1158,26 @@ app.put("/exp_moder",
     ValidatingFunctions.verifyToken,
     ExpModer.giveExpForPosts
 )
+
+/** ========== Игровой процесс ========== */
+
+app.get("/loc_characters",
+    query("roomId").isInt(),
+    ValidatingFunctions.verifyFields,
+    ValidatingFunctions.verifyToken,
+    GameProcess.getCharactersInLocation
+)
+
+/**
+ * Сделать ход
+ */
+app.post("/make_a_move",
+    ValidatingFunctions.verifyFields,
+    ValidatingFunctions.verifyToken,
+    GameProcess.makeMove
+)
+
+/** Игровые сражения */
 
 
 app.listen(80, () => {
