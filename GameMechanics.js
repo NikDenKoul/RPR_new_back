@@ -192,11 +192,33 @@ module.exports = {
 
     /** ========== Взаимодействие с ситемой сражений ========== */
 
+    /**
+     *
+     * @param {object} req.body -
+     * @param {int} req.body.serverId -
+     * @param {int} req.body.fight_settings_flags.attack_AP_cost - стоимость ОД за атаку (NULL если не разрешены на сервере)
+     * @param {int} req.body.fight_settings_flags.dodge_AP_cost - стоимость ОД за уворот (NULL если не разрешены на сервере)
+     * @param {int} req.body.fight_settings_flags.skills_enable - разрешить способности на сервере
+     * @param {int} req.body.fight_settings_flags.HP_attribute - аттрибут, отвечающий за здоровье персонажей
+     * @param {string} req.body.fight_settings_flags -
+     * @param {string} req.body.attack_settings_damage -
+     * @param {string} req.body.deleted_ids -
+     * @param res
+     * @returns {Promise<void>}
+     */
     editAttackSettings : async function(req,res) {
 
+        const fight_settings_flags = JSON.parse(req.body.fight_settings_flags);
         const attack_settings_damage = JSON.parse(req.body.attack_settings_damage);
         const deleted_ids = JSON.parse(req.body.deleted_ids)
 
+
+        // Разрешённые действия во время сражений + стоимость ОД
+        dbP.execute("UPDATE game_settings SET attack_AP_cost=?, dodge_AP_cost=?, skills_enable=?, HP_attribute=? " +
+            "WHERE server_id=?;",[fight_settings_flags.attack_AP_cost,fight_settings_flags.dodge_AP_cost,
+        fight_settings_flags.skills_enable,fight_settings_flags.HP_attribute,req.body.serverId])
+
+        // Настройки атаки
         for (const settings of attack_settings_damage) {
             if (settings.id > 0) {
                 dbP.execute("UPDATE attack_settings SET effect_type=?, considered_attribute_id=?, " +
@@ -222,11 +244,15 @@ module.exports = {
      * @param res
      * @returns {Promise<void>}
      */
-    getAttackSettings : async function(req,res) {
-        let [attack_settings_damage] = await dbP.execute("SELECT attribute.server_id, attack_settings.* FROM attack_settings " +
+    getFightSettings : async function(req, res) {
+        const [fight_settings_flags] = await dbP.execute("SELECT attack_AP_cost, dodge_AP_cost, skills_enable, " +
+            "HP_attribute FROM game_settings WHERE server_id=?;",[req.query.serverId]);
+
+        let [attack_settings_damage] = await dbP.execute("SELECT attribute.server_id, attack_settings.* " +
+            "FROM attack_settings " +
             "LEFT JOIN attribute ON considered_attribute_id=attribute.id " +
             "WHERE server_id=?;",[req.query.serverId]);
-        res.send({attack_settings_damage: attack_settings_damage});
+        res.send({fight_settings_flags: fight_settings_flags[0], attack_settings_damage: attack_settings_damage});
     },
 
     /** ========== Взаимодействие с игровыми персонажами ========== */

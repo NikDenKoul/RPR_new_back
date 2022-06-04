@@ -903,7 +903,7 @@ app.get("/attack_settings",
     query("serverId").isInt(),
     ValidatingFunctions.verifyFields,
     ValidatingFunctions.verifyToken,
-    GameMechanics.getAttackSettings
+    GameMechanics.getFightSettings
 )
 
 /** ========== Взаимодействие с игровыми персонажами ========== */
