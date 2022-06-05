@@ -94,7 +94,14 @@ module.exports = {
          */
         const actor = req.body.actor;
         const [actor_character] = await dbP.execute("SELECT * FROM `character` WHERE id=?;",[actor]);
+        const [battle] = await dbP.execute("SELECT battle.*, battle_participants.character_id, " +
+            "battle_participants.order FROM battle " +
+            "LEFT JOIN battle_participants ON battle.id=battle_participants.battle_id " +
+            "WHERE date_of_end IS NULL AND character_id=?;",[actor]);
 
+
+        // res.send({message:"here"})
+        // return;
         const actions = JSON.parse(req.body.actions);
 
         let [game_settings] = await dbP.execute("SELECT * FROM game_settings WHERE server_id=?;",
@@ -115,89 +122,102 @@ module.exports = {
             "WHERE attribute.server_id=? AND attribute.isGeneral=0;",
             [req.body.serverId]);
 
+
         // Если драка не началась, мы её начинаем
-        let new_participants = [Number(actor),actions[0].target_id]
-        let cur_date = new Date();
-        let cur_date_str = cur_date.getFullYear() + "-" +
-            (cur_date.getMonth()<9 ? "0" : "") + (cur_date.getMonth() + 1) + "-" +
-            (cur_date.getDate()<10 ? "0" : "") + cur_date.getDate() + "T" +
-            (cur_date.getHours()<10 ? "0" : "") + cur_date.getHours() + ":" +
-            (cur_date.getMinutes()<10 ? "0" : "") + cur_date.getMinutes() + ":" +
-            (cur_date.getSeconds()<10 ? "0" : "") + cur_date.getSeconds();
+        if (battle.length == 0) {
+            let new_participants = [Number(actor),actions[0].target_id]
+            let cur_date = new Date();
+            let cur_date_str = cur_date.getFullYear() + "-" +
+                (cur_date.getMonth()<9 ? "0" : "") + (cur_date.getMonth() + 1) + "-" +
+                (cur_date.getDate()<10 ? "0" : "") + cur_date.getDate() + "T" +
+                (cur_date.getHours()<10 ? "0" : "") + cur_date.getHours() + ":" +
+                (cur_date.getMinutes()<10 ? "0" : "") + cur_date.getMinutes() + ":" +
+                (cur_date.getSeconds()<10 ? "0" : "") + cur_date.getSeconds();
 
-        db.query("INSERT INTO battle VALUES(NULL,?,?,NULL,?,1);",
-            [req.body.serverId,cur_date_str,actor_character[0].current_location_id],
-            async function(err,data) {
-                let battle_id = data.insertId;
-                let next_order = 1;
+            db.query("INSERT INTO battle VALUES(NULL,?,?,NULL,?,1);",
+                [req.body.serverId,cur_date_str,actor_character[0].current_location_id],
+                async function(err,data) {
+                    let battle_id = data.insertId;
+                    let next_order = 1;
 
-                for (const id of new_participants) {
-                    dbP.execute("INSERT INTO battle_participants VALUES(NULL,?,?,?,NULL);",
-                        [battle_id,id,next_order]);
-                    next_order++;
+                    for (const id of new_participants) {
+                        dbP.execute("INSERT INTO battle_participants VALUES(NULL,?,?,?,NULL);",
+                            [battle_id,id,next_order]);
+                        next_order++;
+                    }
+
+                    return;
+                });
+        }
+        const [battle_participants] = await dbP.execute("SELECT * FROM battle_participants WHERE battle_id=?;",
+            [battle[0].id])
+
+        // Если драка уже идёт и очередь наша
+        if (battle[0].current_turn == battle[0].order) {
+            // Выполняем действия по очереди
+            for (const action of actions) {
+                // Рассчет атаки
+                if (action.type == "attack") {
+                    let damage = 0;
+                    let target = action.target_id;
+
+                    let formula_res = 0;
+                    let attribute_owner = 0;
+
+                    // Высчитываем значение наносимого урона
+                    for (const formula of attack_damage) {
+                        // Определяем реальный id владельца рассчитываемого аттрибута
+                        if (formula.attribute_owner == "target") attribute_owner = target;
+                        else if (formula.attribute_owner == "self") attribute_owner = actor;
+                        else attribute_owner = 0;
+
+                        // Получаем текущее значение аттрибута найденного владельца
+                        formula_res = Number(findAttributeCurrentValue(characters_attributes,
+                            attribute_owner,
+                            formula.considered_attribute_id));
+
+                        // Определяем знак
+                        if (formula.effect_type == "decrease") formula_res = -formula_res;
+                        else if (formula.effect_type == "increase");
+                        else formula_res = 0;
+
+                        // Рассчитываем итоговое значение урона
+                        damage += formula_res;
+                    }
+
+                    // Не пропускаем отрицательное значение урона
+                    if (damage < 0) damage = 0;
+
+                    // Выполняем действие
+                    dbP.execute("INSERT INTO attacks_log VALUES(NULL,1,?,?,?,NULL);",
+                        [actor,damage,target]);
                 }
-
-                return;
-            });
-
-        // Если драка уже идёт
-        // ...выполняем действия по очереди
-        for (const action of actions) {
-            // Рассчет атаки
-            if (action.type == "attack") {
-                let damage = 0;
-                let target = action.target_id;
-
-                let formula_res = 0;
-                let attribute_owner = 0;
-
-                // Высчитываем значение наносимого урона
-                for (const formula of attack_damage) {
-                    // Определяем реальный id владельца рассчитываемого аттрибута
-                    if (formula.attribute_owner == "target") attribute_owner = target;
-                    else if (formula.attribute_owner == "self") attribute_owner = actor;
-                    else attribute_owner = 0;
-
-                    // Получаем текущее значение аттрибута найденного владельца
-                    formula_res = Number(findAttributeCurrentValue(characters_attributes,
-                                                                 attribute_owner,
-                                                                 formula.considered_attribute_id));
-
-                    // Определяем знак
-                    if (formula.effect_type == "decrease") formula_res = -formula_res;
-                    else if (formula.effect_type == "increase");
-                    else formula_res = 0;
-
-                    // Рассчитываем итоговое значение урона
-                    damage += formula_res;
-                }
-
-                // Не пропускаем отрицательное значение урона
-                if (damage < 0) damage = 0;
-
-                // Выполняем действие
-                dbP.execute("INSERT INTO attacks_log VALUES(NULL,1,?,?,?,NULL);",
-                    [actor,damage,target]);
             }
+
+            // Получаем урон (пизды) от атак, от которых не увернулись
+            const [incoming_attacks] = await dbP.execute("SELECT * FROM attacks_log " +
+                "WHERE target=? AND dodged IS NULL;",[actor])
+
+            let considered_target_HP = Number(findAttributeCurrentValue(characters_attributes,
+                actor,game_settings.HP_attribute));
+
+            for (const attack of incoming_attacks) {
+                considered_target_HP -= attack.damage_value;
+            }
+            dbP.execute("UPDATE characters_attributes SET current_value=? " +
+                "WHERE character_id=? AND attribute_id=?;",
+                [considered_target_HP,actor,game_settings.HP_attribute]);
+            dbP.execute("UPDATE attacks_log SET dodged=0 WHERE target=? AND dodged IS NULL;",
+                [actor])
+
+            // Передаём ход
+            let new_turn = battle[0].current_turn == battle_participants.length ? 1 : battle[0].current_turn + 1;
+            dbP.execute("UPDATE battle SET current_turn=? " +
+                "WHERE id=?",[new_turn,battle[0].id])
         }
 
-        // Получаем урон (пизды) от атак, от которых не увернулись
-        const [incoming_attacks] = await dbP.execute("SELECT * FROM attacks_log " +
-            "WHERE target=? AND dodged IS NULL;",[actor])
 
-        let considered_target_HP = Number(findAttributeCurrentValue(characters_attributes,
-            actor,game_settings.HP_attribute));
-
-        for (const attack of incoming_attacks) {
-            considered_target_HP -= attack.damage_value;
-        }
-        dbP.execute("UPDATE characters_attributes SET current_value=? " +
-            "WHERE character_id=? AND attribute_id=?;",
-            [considered_target_HP,actor,game_settings.HP_attribute]);
-        dbP.execute("UPDATE attacks_log SET dodged=0 WHERE target=? AND dodged IS NULL;",
-            [actor])
-
-        res.send({success:1});
+        res.send({success:1,battle_participants:battle_participants});
     }
 }
 
