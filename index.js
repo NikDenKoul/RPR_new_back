@@ -1177,6 +1177,15 @@ app.post("/make_a_move",
     GameProcess.makeMove
 )
 
+/**
+ * Узнать, чей сейчас ход
+ */
+app.get("/battle_turn",
+    ValidatingFunctions.verifyFields,
+    ValidatingFunctions.verifyToken,
+    GameProcess.getCurrentTurn
+)
+
 /** Игровые сражения */
 
 

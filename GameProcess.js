@@ -218,6 +218,15 @@ module.exports = {
 
 
         res.send({success:1,battle_participants:battle_participants});
+    },
+
+    getCurrentTurn: async function(req,res) {
+        let [turn] = await dbP.execute("SELECT battle_participants.character_id FROM battle " +
+            "LEFT JOIN battle_participants ON battle.id=battle_participants.battle_id " +
+            "WHERE date_of_end IS NULL AND location_id=? AND `order`=current_turn;",
+            [req.query.locationId]);
+        turn = turn.length == 0 ? 0 : turn[0].character_id;
+        res.send({turn:turn});
     }
 }
 
