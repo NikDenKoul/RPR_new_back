@@ -93,6 +93,7 @@ module.exports = {
          * @type {Number}
          */
         const actor = req.body.actor;
+        const [actor_character] = await dbP.execute("SELECT * FROM `character` WHERE id=?;",[actor]);
 
         const actions = JSON.parse(req.body.actions);
 
@@ -115,6 +116,29 @@ module.exports = {
             [req.body.serverId]);
 
         // Если драка не началась, мы её начинаем
+        let new_participants = [Number(actor),actions[0].target_id]
+        let cur_date = new Date();
+        let cur_date_str = cur_date.getFullYear() + "-" +
+            (cur_date.getMonth()<9 ? "0" : "") + (cur_date.getMonth() + 1) + "-" +
+            (cur_date.getDate()<10 ? "0" : "") + cur_date.getDate() + "T" +
+            (cur_date.getHours()<10 ? "0" : "") + cur_date.getHours() + ":" +
+            (cur_date.getMinutes()<10 ? "0" : "") + cur_date.getMinutes() + ":" +
+            (cur_date.getSeconds()<10 ? "0" : "") + cur_date.getSeconds();
+
+        db.query("INSERT INTO battle VALUES(NULL,?,?,NULL,?,1);",
+            [req.body.serverId,cur_date_str,actor_character[0].current_location_id],
+            async function(err,data) {
+                let battle_id = data.insertId;
+                let next_order = 1;
+
+                for (const id of new_participants) {
+                    dbP.execute("INSERT INTO battle_participants VALUES(NULL,?,?,?,NULL);",
+                        [battle_id,id,next_order]);
+                    next_order++;
+                }
+
+                return;
+            });
 
         // Если драка уже идёт
         // ...выполняем действия по очереди
