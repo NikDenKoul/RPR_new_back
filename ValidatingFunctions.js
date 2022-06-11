@@ -36,6 +36,7 @@ module.exports = {
      * @param character_id - id персонажа
      */
     compareUserAndCharacter : async function (user_id, character_id) {
+
         let [actual_owner] = dbP.execute("SELECT user_id FROM `character` WHERE id=?;",[character_id]);
         actual_owner = actual_owner[0].user_id;
 
@@ -43,7 +44,14 @@ module.exports = {
         else return false;
     },
 
+    /**
+     * Проверить, является ли комната игровой локацией
+     *
+     * @param room_id - id комнаты
+     * @returns {Promise<boolean>}
+     */
     isRoomLocation : async function (room_id) {
+
         const [room] = await dbP.execute("SELECT * FROM `room` WHERE id=?;",[room_id]);
         if (!room[0].is_location) {
             return false;
