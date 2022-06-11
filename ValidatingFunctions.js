@@ -15,7 +15,7 @@ const dbP = db.promise();
 
 module.exports = {
     /**
-     * Проверить права пользователя на что-либо
+     * Проверить права пользователя на что-либо (в соответствии с ролью на сервере)
      * @param right
      * @param userId
      * @param serverId
@@ -27,6 +27,28 @@ module.exports = {
             "                                    WHERE users_servers.server_id=? AND users_servers.user_id=?",[serverId,userId]);
         if(roles.length === 0 && adminServer.length === 0)return false;
         return roles[0][right] == 1 || adminServer.length !== 0;
+    },
+
+    /**
+     * Проверить, принадлежит ли персонаж пользователю
+     *
+     * @param user_id - id пользователя
+     * @param character_id - id персонажа
+     */
+    compareUserAndCharacter : async function (user_id, character_id) {
+        let [actual_owner] = dbP.execute("SELECT user_id FROM `character` WHERE id=?;",[character_id]);
+        actual_owner = actual_owner[0].user_id;
+
+        if (actual_owner == user_id) return true;
+        else return false;
+    },
+
+    isRoomLocation : async function (room_id) {
+        const [room] = await dbP.execute("SELECT * FROM `room` WHERE id=?;",[room_id]);
+        if (!room[0].is_location) {
+            return false;
+        }
+        else return true;
     },
 
     verifyToken : async function (req,res,next){
