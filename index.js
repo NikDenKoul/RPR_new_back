@@ -468,14 +468,18 @@ app.post("/servers",
     ValidatingFunctions.verifyToken,
     async function(req,res){
         db.query("INSERT INTO server VALUES(NULL,?,?,?,?,?,0,?,?,?,1)",
-            [req.body.name,req.body.description ?? "",req.body.avatar ?? null,req.body.bg ?? null,req.body.isPrivate,req.userId,req.body.age,req.body.tags ?? ""],async function(err,data){
+            [req.body.name,req.body.description ?? "",req.body.avatar ?? null,req.body.bg ?? null,
+                req.body.isPrivate,req.userId,req.body.age,req.body.tags ?? ""],
+            async function(err,data){
                 let serverId = data.insertId;
                 await dbP.execute("INSERT INTO role VALUES(NULL,'Админ',?,1,1,1,1,1,0,1,'red',1,1)",[serverId]);
                 let [roleId] = await dbP.execute("SELECT id FROM role WHERE server_id = ?;", [serverId]);
                 roleId = roleId[0].id;
                 await dbP.execute("INSERT INTO users_servers VALUES(null,?,?,?,NULL)",[serverId,req.userId,roleId]);
                 res.send({id:serverId});
+                await dbP.execute("INSERT INTO game_settings VALUES(?,0,0,0,1,1,0,0)",[serverId]);
             });
+
 
     }
 )
