@@ -1051,6 +1051,34 @@ app.get("/loc_characters",
     GameProcess.getCharactersInLocation
 )
 
+app.put("/loc_change",
+    body("characterId").isInt(),
+    body("roomId").isInt(),
+    ValidatingFunctions.verifyFields,
+    ValidatingFunctions.verifyToken,
+    GameProcess.spawnInLocation
+)
+
+/** Игровые сражения */
+
+app.post("/battle_call",
+    ValidatingFunctions.verifyFields,
+    ValidatingFunctions.verifyToken,
+    GameProcess.sendBattleRequest
+)
+
+app.put("/battle_confirm",
+    ValidatingFunctions.verifyFields,
+    ValidatingFunctions.verifyToken,
+    GameProcess.confirmBattleRequest
+)
+
+app.put("/battle_reject",
+    ValidatingFunctions.verifyFields,
+    ValidatingFunctions.verifyToken,
+    GameProcess.rejectBattleRequest
+)
+
 /**
  * Сделать ход
  */
@@ -1068,8 +1096,6 @@ app.get("/battle_turn",
     ValidatingFunctions.verifyToken,
     GameProcess.getCurrentTurn
 )
-
-/** Игровые сражения */
 
 
 app.listen(80, () => {

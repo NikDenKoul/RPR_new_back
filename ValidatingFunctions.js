@@ -52,11 +52,8 @@ module.exports = {
      */
     isRoomLocation : async function (room_id) {
 
-        const [room] = await dbP.execute("SELECT * FROM `room` WHERE id=?;",[room_id]);
-        if (!room[0].is_location) {
-            return false;
-        }
-        else return true;
+        let [room] = await dbP.execute("SELECT * FROM `room` WHERE id=?;",[room_id]);
+        return room[0].is_location;
     },
 
     verifyToken : async function (req,res,next){

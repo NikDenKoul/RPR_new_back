@@ -22,23 +22,42 @@ module.exports = {
      * @returns {Promise<void>}
      */
     getCharactersInLocation : async function(req,res) {
-        const [characters] = await dbP.execute("SELECT * FROM `character` WHERE current_location_id=?;",[req.query.roomId])
-        res.send({characters: characters});
+
+        let permission = await ValidatingFunctions.isRoomLocation(req.query.roomId);
+        if (!permission) {
+            res.send({success: 0, err: "Room is not a location", permission: permission})
+            return;
+        }
+        let [characters] = await dbP.execute("SELECT * FROM `character` WHERE current_location_id=?;",[req.query.roomId])
+        res.send({success: 1, characters: characters});
+        return;
     },
 
     /**
      * Переместить персонажа в новую локацию
      *
+     * @param {int} req.userId - id пользователя, пославшего запрос
      * @param {object} req.body -
-     * @param {int} req.body.characterId -
-     * @param {int} req.body.roomId -
+     * @param {int} req.body.characterId - id персонажа, который должен сменить локацию
+     * @param {int} req.body.roomId - id комнаты (локации), в которую должен переместиться персонаж
      * @param res
      * @returns {Promise<void>}
      */
     spawnInLocation : async function(req,res) {
         const character_id = req.body.characterId;
+        const user_id = req.userId;
 
-        // Проверить права: либо владелец персонажа, либо ГМ
+        // Проверка прав
+        if (!await ValidatingFunctions.compareUserAndCharacter(user_id, character_id)) {
+            res.send({success: 0, err: "Попытка выполнить действие за чужего персонажа"})
+            return;
+        }
+
+        // Проверка, что новая комната является локацией
+        if (!await ValidatingFunctions.isRoomLocation(req.body.roomId)) {
+            res.send({success: 0, err: "Комната не является локацией"})
+            return;
+        }
 
         // Сменить локацию для персонажа
         dbP.execute("UPDATE `character` SET current_location_id=? WHERE id=?;",
@@ -48,6 +67,70 @@ module.exports = {
     },
 
     /** ========== Игровые сражения ========== */
+
+    /**
+     * Вызвать другого персонажа на битву
+     *
+     * @param req - запрос
+     * @param req.body - тело запроса
+     * @param {int} req.body.senderId - id персонажа, бросающего вызов
+     * @param {int} req.body.recipient - id персонажа, кому бросается вызов
+     * @param {int} req.body.location - id локации, на которой проводится сражение
+     * @param res
+     * @returns {Promise<void>}
+     */
+    sendBattleRequest : async function(req,res) {
+
+        let cur_date = new Date();
+        let cur_date_str = cur_date.getFullYear() + "-" +
+            (cur_date.getMonth()<9 ? "0" : "") + (cur_date.getMonth() + 1) + "-" +
+            (cur_date.getDate()<10 ? "0" : "") + cur_date.getDate() + "T" +
+            (cur_date.getHours()<10 ? "0" : "") + cur_date.getHours() + ":" +
+            (cur_date.getMinutes()<10 ? "0" : "") + cur_date.getMinutes() + ":" +
+            (cur_date.getSeconds()<10 ? "0" : "") + cur_date.getSeconds();
+
+        dbP.execute("INSERT INTO start_battle_request VALUES(NULL,?,?,?,?,NULL);",
+            [req.body.senderId,req.body.recipient,cur_date_str,req.body.location]);
+
+        res.send({success:1});
+    },
+
+    /**
+     * Принять призыв к сражению
+     *
+     * @param {object} req - запрос
+     * @param {int} req.query.requestId - id запроса на начало сражения
+     * @param res - ответ
+     * @returns {Promise<void>}
+     */
+    confirmBattleRequest : async function(req,res) {
+        let [request] = await dbP.execute("SELECT sender_id, recipient, location FROM start_battle_request " +
+            "WHERE id=?;",[req.query.requestId]);
+        let participants = [request[0].sender_id, request[0].recipient];
+        const location_id = request[0].location;
+        let err = null;
+
+        await private_startBattle(participants, location_id, err);
+        if (err != null) {
+            res.send({success:0, err:err.err_text});
+            return;
+        }
+        dbP.execute("UPDATE start_battle_request SET respond=1 WHERE id=?;",[req.query.requestId]);
+        res.send({success:1});
+    },
+
+    /**
+     * Отклонить призыв к сражению
+     *
+     * @param req
+     * @param {int} req.query.requestId - id запроса на начало сражения
+     * @param res
+     * @returns {Promise<void>}
+     */
+    rejectBattleRequest : async function(req,res) {
+        dbP.execute("UPDATE start_battle_request SET respond=0 WHERE id=?;",[req.query.requestId]);
+        res.send({success:1});
+    },
 
     /**
      * Начать сражение
@@ -61,6 +144,7 @@ module.exports = {
      * @returns {Promise<void>}
      */
     startBattle : async function(req,res) {
+
 
         // Создаём новое сражение
         db.query("INSERT INTO battle VALUES(NULL,?,?,NULL,?,1);",
@@ -125,29 +209,12 @@ module.exports = {
 
         // Если драка не началась, мы её начинаем
         if (battle.length == 0) {
-            let new_participants = [Number(actor),actions[0].target_id]
-            let cur_date = new Date();
-            let cur_date_str = cur_date.getFullYear() + "-" +
-                (cur_date.getMonth()<9 ? "0" : "") + (cur_date.getMonth() + 1) + "-" +
-                (cur_date.getDate()<10 ? "0" : "") + cur_date.getDate() + "T" +
-                (cur_date.getHours()<10 ? "0" : "") + cur_date.getHours() + ":" +
-                (cur_date.getMinutes()<10 ? "0" : "") + cur_date.getMinutes() + ":" +
-                (cur_date.getSeconds()<10 ? "0" : "") + cur_date.getSeconds();
+            let new_participants = [actor,actions[0].target_id]
+            let err = null;
+            await private_startBattle(new_participants, actor_character[0].current_location_id, err);
+            if (err != null) {
 
-            db.query("INSERT INTO battle VALUES(NULL,?,?,NULL,?,1);",
-                [req.body.serverId,cur_date_str,actor_character[0].current_location_id],
-                async function(err,data) {
-                    let battle_id = data.insertId;
-                    let next_order = 1;
-
-                    for (const id of new_participants) {
-                        dbP.execute("INSERT INTO battle_participants VALUES(NULL,?,?,?,NULL);",
-                            [battle_id,id,next_order]);
-                        next_order++;
-                    }
-
-                    return;
-                });
+            }
         }
         const [battle_participants] = await dbP.execute("SELECT * FROM battle_participants WHERE battle_id=?;",
             [battle[0].id])
@@ -242,4 +309,65 @@ function findAttributeCurrentValue(characters_attributes, character_id, attribut
             return attribute.current_value;
         }
     }
+}
+
+/**
+ * Начать новое сражение
+ *
+ * @param {int[]} participants - id'шники участников сражения
+ * @param {int} location_id - локация проведения сражения
+ * @param err - сообщение об ошибке
+ * @returns {Promise<void>}
+ */
+async function private_startBattle(participants,location_id,err) {
+
+    // Список персонажей в текущей локации
+    const [characters_in_location] = await dbP.execute("SELECT id FROM `character` " +
+        "WHERE location_id=?;",[location_id])
+    // Список персонажей, сражающихся где-либо
+    const [characters_in_battle] = await dbP.execute("SELECT character_id FROM battle_participants " +
+        "WHERE result=NULL;")
+
+    // Проверяем, что все участники в одной локации И никто пока ещё не сражается
+    for (const character_id of participants) {
+        if (characters_in_location.find((character) => character.id == character_id) == null) {
+            const character_name = dbP.execute("SELECT characterName FROM `character` WHERE id=?;",
+                [character_id])
+            err.send({err_text: "Персонаж " + character_name[0].characterName + " находится в другой локации."});
+            return;
+        }
+
+        if (characters_in_battle.find((character) => character.id == character_id) != null) {
+            const character_name = dbP.execute("SELECT characterName FROM `character` WHERE id=?;",
+                [character_id])
+            err.send({err_text: "Персонаж " + character_name[0].characterName + " участвует в другом сражении."});
+            return;
+        }
+    }
+
+    // Получаем текущую дату - это будет дата начала сражения
+    let cur_date = new Date();
+    let cur_date_str = cur_date.getFullYear() + "-" +
+        (cur_date.getMonth()<9 ? "0" : "") + (cur_date.getMonth() + 1) + "-" +
+        (cur_date.getDate()<10 ? "0" : "") + cur_date.getDate() + "T" +
+        (cur_date.getHours()<10 ? "0" : "") + cur_date.getHours() + ":" +
+        (cur_date.getMinutes()<10 ? "0" : "") + cur_date.getMinutes() + ":" +
+        (cur_date.getSeconds()<10 ? "0" : "") + cur_date.getSeconds();
+
+    // Создаём новой сражение в БД
+    db.query("INSERT INTO battle VALUES(NULL,?,NULL,?,1);",
+        [cur_date_str,location_id],
+        async function(err,data) {
+            let battle_id = data.insertId;
+            let next_order = 1;
+
+            for (const id of participants) {
+                dbP.execute("INSERT INTO battle_participants VALUES(NULL,?,?,?,NULL);",
+                    [battle_id,id,next_order]);
+                next_order++;
+            }
+
+            return;
+        });
+    return;
 }
